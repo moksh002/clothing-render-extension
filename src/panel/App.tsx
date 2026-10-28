@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ProfileTab } from './ProfileTab';
 
 type Tab = 'profile' | 'tryon';
 
@@ -32,7 +33,7 @@ export function App() {
       </div>
       <section role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="card">
         {tab === 'profile' ? (
-          <p className="muted">Your measurements will go here.</p>
+          <ProfileTab />
         ) : (
           <p className="muted">Open a Target or Kmart top to see your fit here.</p>
         )}

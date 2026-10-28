@@ -17,3 +17,18 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .muted { color: var(--muted); margin: 0; }
+.form { display: grid; gap: 12px; }
+.row { display: flex; justify-content: space-between; gap: 8px; }
+.segmented { display: inline-flex; background: #e9ecf0; border-radius: 8px; padding: 2px; }
+.segmented button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font: inherit; color: var(--muted); }
+.segmented button[aria-pressed='true'] { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.field { display: grid; grid-template-columns: 1fr 130px; align-items: center; gap: 2px 8px; }
+.input-wrap { display: flex; align-items: center; gap: 6px; }
+.input-wrap input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.input-wrap input[aria-invalid='true'] { border-color: #d33; }
+.input-wrap em { font-style: normal; color: var(--muted); width: 22px; }
+.error { grid-column: 1 / -1; color: #c0262d; }
+.actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.actions button { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font: inherit; }
+.actions .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.status { color: #1c7c3b; }
