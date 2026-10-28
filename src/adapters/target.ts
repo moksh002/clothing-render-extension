@@ -24,6 +24,13 @@ const clean = (s: string | null | undefined) => (s ?? '').replace(/[ \s]+/g, ' 
 
 // ---- Adapter -------------------------------------------------------------
 
+/** The first gallery photo, requested at a small size (the page asks for 1400x1600). */
+function targetImageUrl(doc: Document): string | undefined {
+  const src = doc.querySelector('[data-testid=gallery-slide-0] img')?.getAttribute('src');
+  if (src) return src.replace(/width%3A\d+%2Cheight%3A\d+/, 'width%3A320%2Cheight%3A400');
+  return doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? undefined;
+}
+
 export const targetAdapter: StoreAdapter = {
   store: 'target',
 
@@ -66,7 +73,7 @@ export const targetAdapter: StoreAdapter = {
     };
     return {
       facts,
-      imageUrl: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? undefined,
+      imageUrl: targetImageUrl(doc),
       sizeGuideEl: doc.querySelector('[data-testid=size-guide-link]'),
     };
   },

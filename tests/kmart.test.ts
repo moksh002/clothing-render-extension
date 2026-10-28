@@ -54,6 +54,11 @@ describe('Kmart product facts (K1)', () => {
     expect(g.sleeveStyle).toBe('short');
   });
 
+  it('finds the main product photo', () => {
+    const r = kmartAdapter.extract(k1Page({ popup: false }), new URL(K1_URL))!;
+    expect(r.imageUrl).toBe('https://assets.kmart.com.au/transform/63a7ba14-fa59-4ba3-8a74-e5ccd3b8ff5b/74111084-1');
+  });
+
   it('ignores the site menu lists', () => {
     expect(facts(k1Page({ popup: false })).features.join(' ')).not.toContain('Plus Size');
   });

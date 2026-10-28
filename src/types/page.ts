@@ -1,5 +1,12 @@
 import type { ChartSource, Garment, ProductFacts } from './index';
 
+/** Appearance read from the product photo. */
+export interface PhotoLook {
+  colour: string;
+  /** PNG data URL of the garment cut out of the photo, when it has a print. */
+  textureDataUrl?: string;
+}
+
 /** What the content script tells the panel about the page the user is on. */
 export type PageState =
   | { kind: 'loading'; url: string }
@@ -13,6 +20,9 @@ export type PageState =
       /** Present when a chart was resolved. */
       garment?: Garment;
       source?: ChartSource;
+      /** Colour and print from the product photo, when it could be read. */
+      look?: PhotoLook;
+      imageUrl?: string;
       /** Present when no chart could be resolved. */
       failure?: { reason: string; message: string };
     };
