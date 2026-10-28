@@ -145,7 +145,15 @@ export function parseTargetCms(json: string): Partial<Record<TargetChartKey, { n
 
 // ---- Resolver ---------------------------------------------------------------
 
-export async function resolveTargetChart(facts: ProductFacts, deps: ResolveDeps): Promise<ResolveOutcome> {
+/**
+ * Resolve a chart by Target's rules. `live` is how the data is labelled when it is read: 'live' on a
+ * Target page (step 4), 'rule' when a Target-branded item is listed on another store (step 5).
+ */
+export async function resolveTargetChart(
+  facts: ProductFacts,
+  deps: ResolveDeps,
+  liveAs: { method: 'live' | 'rule'; step: 4 | 5 } = { method: 'live', step: 4 },
+): Promise<ResolveOutcome> {
   const plan = planTargetChart(facts);
   if (!plan.ok) return plan;
 
@@ -164,9 +172,9 @@ export async function resolveTargetChart(facts: ProductFacts, deps: ResolveDeps)
       store: 'target',
       chartName: hit.name,
       url: TARGET_CHART_URL,
-      method: 'live',
+      method: liveAs.method,
       retrievedAt: deps.now().toISOString().slice(0, 10),
-      step: 4,
+      step: liveAs.step,
     };
     return { ok: true, chart: { ...hit.chart, source }, source };
   }

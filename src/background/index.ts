@@ -24,6 +24,29 @@ chrome.runtime.onMessage.addListener((msg: PageMessage, sender) => {
   }
 });
 
+// Cross-site fetch for Target size data shown on a Kmart page (content scripts are bound by the page's CORS).
+// Only Target's own site is allowed.
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type !== 'fetch-text') return false;
+  try {
+    const u = new URL(msg.url);
+    if (u.protocol !== 'https:' || !(u.hostname === 'target.com.au' || u.hostname.endsWith('.target.com.au'))) {
+      sendResponse({ ok: false, error: 'host not allowed' });
+      return false;
+    }
+  } catch {
+    sendResponse({ ok: false, error: 'bad url' });
+    return false;
+  }
+  fetch(msg.url)
+    .then(async (r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      sendResponse({ ok: true, text: await r.text() });
+    })
+    .catch((e) => sendResponse({ ok: false, error: String(e) }));
+  return true; // async response
+});
+
 chrome.tabs.onRemoved.addListener((tabId) => {
   chrome.storage.session.remove(stateKey(tabId));
 });
