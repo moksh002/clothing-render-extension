@@ -57,3 +57,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .paste textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
 .paste textarea[aria-invalid='true'] { border-color: #d33; }
 .small { font-size: 12px; }
+.figure-wrap { display: grid; gap: 6px; }
+.figure3d-box { background: linear-gradient(#f5f7fa, #e9edf3); border-radius: 10px; overflow: hidden; line-height: 0; }
+.figure3d { display: block; cursor: grab; touch-action: none; }
+.figure3d:active { cursor: grabbing; }
+.figure-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.figure-bar .segmented button { padding: 4px 10px; font-size: 12px; }
