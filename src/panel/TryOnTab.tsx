@@ -17,6 +17,8 @@ import type { BodyProfile, ChartSource, FitResult, Garment } from '../types';
 import { FitFigure } from './FitFigure';
 import { PasteChart } from './PasteChart';
 import { usePageState } from './usePageState';
+import { parseProductLink } from '../adapters/link';
+import type { LinkMessage } from '../types/page';
 
 const CONVENTION_TEXT = {
   body: 'The chart lists body measurements, so the garment is the body size plus style ease.',
@@ -57,7 +59,10 @@ const manualSource = (store: ChartSource['store'], url: string): ChartSource => 
 });
 
 export function TryOnTab({ goProfile }: { goProfile: () => void }) {
-  const page = usePageState();
+  const [link, setLink] = useState<string | undefined>();
+  const [linkText, setLinkText] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const page = usePageState(link);
   const [profile, setProfile] = useState<BodyProfile | null | undefined>(undefined);
   const [size, setSize] = useState('');
   const [manual, setManual] = useState<ManualChart | null>(null);
@@ -125,11 +130,72 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
     [profile, garment, size],
   );
 
-  if (page.kind === 'loading') return <p className="muted">Reading the product page…</p>;
-  if (page.kind !== 'product') return <p className="empty">{page.message}</p>;
+  const submitLink = () => {
+    const r = parseProductLink(linkText);
+    if (!r.ok) {
+      setLinkError(r.message);
+      return;
+    }
+    setLinkError('');
+    setLink(r.url);
+    const msg: LinkMessage = { type: 'open-link', url: r.url };
+    chrome.runtime.sendMessage(msg).catch(() => {});
+  };
+
+  const linkBox = (
+    <form
+      className="linkbox"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submitLink();
+      }}
+    >
+      <input
+        value={linkText}
+        onChange={(e) => setLinkText(e.target.value)}
+        placeholder="Paste a Target or Kmart product link"
+        aria-label="Product link"
+        aria-invalid={!!linkError}
+      />
+      <button type="submit" className="primary">
+        Show
+      </button>
+      {linkError && (
+        <small className="error" role="alert">
+          {linkError}
+        </small>
+      )}
+      {link && (
+        <p className="muted small">
+          Showing the pasted link.{' '}
+          <button type="button" className="link" onClick={() => setLink(undefined)}>
+            Use the current tab instead
+          </button>
+        </p>
+      )}
+    </form>
+  );
+
+  if (page.kind === 'loading') {
+    return (
+      <div className="tryon">
+        {linkBox}
+        <p className="muted">{link ? 'Loading the link in a background tab…' : 'Reading the product page…'}</p>
+      </div>
+    );
+  }
+  if (page.kind !== 'product') {
+    return (
+      <div className="tryon">
+        {linkBox}
+        <p className="empty">{page.message}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="tryon">
+      {linkBox}
       <h2 className="product-title">{page.facts.title}</h2>
 
       {page.failure && !garment && <p className="warn">{page.failure.message}</p>}

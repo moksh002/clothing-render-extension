@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "See how a top fits your measurements on Target AU and Kmart AU product pages.",
   "minimum_chrome_version": "114",
-  "permissions": ["storage", "sidePanel"],
+  "permissions": ["storage", "sidePanel", "alarms"],
   "host_permissions": ["https://*.target.com.au/*", "https://*.kmart.com.au/*", "https://*.myer.com.au/*"],
   "action": { "default_title": "Open Virtual Fit" },
   "side_panel": { "default_path": "src/panel/index.html" },

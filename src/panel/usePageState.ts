@@ -1,19 +1,30 @@
 import { useEffect, useState } from 'react';
 import { classifyPage } from '../adapters';
-import { stateKey, type PageState } from '../types/page';
+import { linkResultKey, stateKey, type LinkResult, type PageState } from '../types/page';
 
 const GENERIC_UNSUPPORTED = 'Open a product page on Target or Kmart to see how it fits.';
 
 const sameUrl = (a: string, b: string) => a.split('#')[0] === b.split('#')[0];
 
 /** The page state for the tab the user is looking at. */
-export function usePageState(): PageState {
+/** The page state for the active tab, or for a pasted link when `linkUrl` is given. */
+export function usePageState(linkUrl?: string): PageState {
   const [state, setState] = useState<PageState>({ kind: 'loading', url: '' });
 
   useEffect(() => {
     let cancelled = false;
 
+    async function refreshLink(url: string) {
+      const key = linkResultKey(url);
+      const r = (await chrome.storage.session.get(key))[key] as LinkResult | undefined;
+      if (cancelled) return;
+      if (!r || r.status === 'loading') setState({ kind: 'loading', url });
+      else if (r.status === 'error') setState({ kind: 'unsupported', url, message: r.message });
+      else setState(r.state);
+    }
+
     async function refresh() {
+      if (linkUrl) return refreshLink(linkUrl);
       // `?tab=<id>` pins the panel to one tab (used by automated tests).
       const pinned = Number(new URLSearchParams(location.search).get('tab'));
       const [tab] = pinned
@@ -53,7 +64,7 @@ export function usePageState(): PageState {
       chrome.tabs.onActivated.removeListener(refresh);
       chrome.tabs.onUpdated.removeListener(refresh);
     };
-  }, []);
+  }, [linkUrl]);
 
   return state;
 }

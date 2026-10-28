@@ -65,3 +65,8 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .figure-bar .segmented button { padding: 4px 10px; font-size: 12px; }
 .photo-look { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.2); display: inline-block; }
+.linkbox { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; }
+.linkbox input { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; font: inherit; min-width: 0; }
+.linkbox input[aria-invalid='true'] { border-color: #d33; }
+.linkbox button.primary { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; font: inherit; }
+.linkbox .error, .linkbox p { grid-column: 1 / -1; margin: 0; }
