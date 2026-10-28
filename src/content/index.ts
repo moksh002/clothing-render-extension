@@ -16,6 +16,18 @@ function publish(state: PageState) {
   });
 }
 
+/** Same-site fetches run here; cross-site ones (Target data on a Kmart page) go through the background worker. */
+async function fetchText(u: string): Promise<string> {
+  if (new URL(u).origin === location.origin) {
+    const r = await fetch(u, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
+  }
+  const res = await chrome.runtime.sendMessage({ type: 'fetch-text', url: u });
+  if (!res?.ok) throw new Error(res?.error ?? 'fetch failed');
+  return res.text as string;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Size pickers render client side after load; wait for them. */
@@ -61,11 +73,8 @@ async function run() {
 
   const { facts, imageUrl } = extracted;
   const outcome = await resolveChart(facts, {
-    fetchText: async (u) => {
-      const r = await fetch(u, { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.text();
-    },
+    fetchText,
+    doc: document,
     now: () => new Date(),
   });
   if (id !== runId) return;

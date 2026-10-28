@@ -1,8 +1,9 @@
 import type { ProductFacts } from '../types';
+import { kmartAdapter, resolveKmartChart } from './kmart';
 import { resolveTargetChart, targetAdapter } from './target';
 import type { ResolveDeps, ResolveOutcome, StoreAdapter } from './types';
 
-export const ADAPTERS: StoreAdapter[] = [targetAdapter];
+export const ADAPTERS: StoreAdapter[] = [targetAdapter, kmartAdapter];
 
 export type PageClass =
   | { kind: 'product'; adapter: StoreAdapter }
@@ -31,6 +32,8 @@ export function resolveChart(facts: ProductFacts, deps: ResolveDeps): Promise<Re
   switch (facts.store) {
     case 'target':
       return resolveTargetChart(facts, deps);
+    case 'kmart':
+      return resolveKmartChart(facts, deps);
     default:
       return Promise.resolve({ ok: false, reason: 'no-chart', message: 'This store is not supported yet.' });
   }

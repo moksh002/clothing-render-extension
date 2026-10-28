@@ -23,9 +23,13 @@ export type ResolveFailureReason =
   | 'no-chart';
 
 export interface ResolveDeps {
-  /** Fetch a URL as text. Injected so tests can run on saved fixtures. */
+  /** Fetch a URL as text (may cross sites via the background worker). Injected so tests can use fixtures. */
   fetchText: (url: string) => Promise<string>;
   now: () => Date;
+  /** The live page, for stores whose chart sits in a popup the resolver has to open. */
+  doc?: Document;
+  /** How long to wait for a popup to appear (default 5000 ms). */
+  popupTimeoutMs?: number;
 }
 
 export type ResolveOutcome =
