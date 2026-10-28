@@ -1,10 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeFit } from '../fit/engine';
 import { findRow } from '../fit/sizes';
+import { parseCsvChart } from '../fit/csv';
 import { LABEL_WORDS, summarise } from '../fit/summary';
-import { loadProfile, loadSize, saveSize } from '../profile/storage';
-import type { BodyProfile, ChartSource, FitResult } from '../types';
+import { buildGarment } from '../adapters/garment';
+import {
+  clearManualChart,
+  loadManualChart,
+  loadProfile,
+  loadSize,
+  saveManualChart,
+  saveSize,
+  type ManualChart,
+} from '../profile/storage';
+import type { BodyProfile, ChartSource, FitResult, Garment } from '../types';
 import { FitFigure } from './FitFigure';
+import { PasteChart } from './PasteChart';
 import { usePageState } from './usePageState';
 
 const CONVENTION_TEXT = {
@@ -36,19 +47,50 @@ function SourceInfo({ source, fit }: { source: ChartSource; fit: FitResult }) {
   );
 }
 
+const manualSource = (store: ChartSource['store'], url: string): ChartSource => ({
+  store,
+  chartName: 'Pasted chart',
+  url,
+  method: 'manual',
+  retrievedAt: new Date().toISOString().slice(0, 10),
+  step: 7,
+});
+
 export function TryOnTab({ goProfile }: { goProfile: () => void }) {
   const page = usePageState();
   const [profile, setProfile] = useState<BodyProfile | null | undefined>(undefined);
   const [size, setSize] = useState('');
+  const [manual, setManual] = useState<ManualChart | null>(null);
+  const [pasting, setPasting] = useState(false);
 
   useEffect(() => {
     loadProfile().then(setProfile);
   }, []);
 
   const product = page.kind === 'product' ? page : null;
+
+  // A chart pasted earlier for this product.
+  const url = product?.url;
+  useEffect(() => {
+    setPasting(false);
+    setManual(null);
+    if (url) loadManualChart(url).then(setManual);
+  }, [url]);
+
+  const manualChart = useMemo(() => (manual ? parseCsvChart(manual.text, manual.basis) : null), [manual]);
+  const manualGarment: Garment | null =
+    product && manualChart && 'chart' in manualChart
+      ? buildGarment(product.facts, {
+          ...manualChart.chart,
+          source: manualSource(product.facts.store, product.url),
+        })
+      : null;
+  const garment = manualGarment ?? product?.garment;
+  const source = manualGarment ? manualSource(product!.facts.store, product!.url) : product?.source;
+
   const labels = useMemo(
-    () => (product?.facts.sizeLabels.length ? product.facts.sizeLabels : product?.garment?.chart.rows.map((r) => r.label)) ?? [],
-    [product],
+    () => (product?.facts.sizeLabels.length ? product.facts.sizeLabels : garment?.chart.rows.map((r) => r.label)) ?? [],
+    [product, garment],
   );
 
   // Pick the starting size: last used for this product, else the one selected on the page.
@@ -74,7 +116,6 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageSize]);
 
-  const garment = product?.garment;
   const fit = useMemo(
     () => (profile && garment && size ? computeFit(profile, garment, size) : null),
     [profile, garment, size],
@@ -87,9 +128,23 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
     <div className="tryon">
       <h2 className="product-title">{page.facts.title}</h2>
 
-      {page.failure && <p className="warn">{page.failure.message}</p>}
+      {page.failure && !garment && <p className="warn">{page.failure.message}</p>}
 
-      {garment && (
+      {(!garment || pasting) && (
+        <PasteChart
+          initialText={manual?.text}
+          initialBasis={manual?.basis}
+          onCancel={garment ? () => setPasting(false) : undefined}
+          onUse={(_chart, text, basis) => {
+            const m = { text, basis };
+            setManual(m);
+            setPasting(false);
+            saveManualChart(page.url, m);
+          }}
+        />
+      )}
+
+      {garment && !pasting && (
         <label className="field">
           <span>Size</span>
           <select
@@ -135,8 +190,37 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
               </li>
             ))}
           </ul>
-          {page.source && <SourceInfo source={page.source} fit={fit} />}
+          {source && <SourceInfo source={source} fit={fit} />}
         </>
+      )}
+
+      {garment && !pasting && (
+        <p className="muted small">
+          {manualGarment ? (
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setManual(null);
+                clearManualChart(page.url);
+              }}
+            >
+              {product?.garment ? 'Use the store’s chart instead' : 'Remove pasted chart'}
+            </button>
+          ) : (
+            <button type="button" className="link" onClick={() => setPasting(true)}>
+              Chart looks wrong? Paste your own
+            </button>
+          )}
+          {manualGarment && (
+            <>
+              {' · '}
+              <button type="button" className="link" onClick={() => setPasting(true)}>
+                Edit pasted chart
+              </button>
+            </>
+          )}
+        </p>
       )}
     </div>
   );
