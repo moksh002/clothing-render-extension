@@ -1,0 +1,19 @@
+:root {
+  --bg: #f6f7f9;
+  --card: #fff;
+  --text: #1c1f24;
+  --muted: #6b7280;
+  --line: #e3e6ea;
+  --accent: #2f5bea;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+.app { max-width: 480px; margin: 0 auto; padding: 16px; }
+.header h1 { margin: 0; font-size: 18px; }
+.header p { margin: 2px 0 14px; color: var(--muted); }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: #e9ecf0; border-radius: 10px; margin-bottom: 12px; }
+.tabs button { border: 0; background: none; padding: 8px; border-radius: 7px; cursor: pointer; font: inherit; color: var(--muted); }
+.tabs button[aria-selected='true'] { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.muted { color: var(--muted); margin: 0; }

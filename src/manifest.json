@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Virtual Fit",
+  "version": "0.1.0",
+  "description": "See how a top fits your measurements on Target AU and Kmart AU product pages.",
+  "minimum_chrome_version": "114",
+  "permissions": ["storage", "sidePanel", "activeTab"],
+  "action": { "default_title": "Open Virtual Fit" },
+  "side_panel": { "default_path": "src/panel/index.html" },
+  "background": { "service_worker": "src/background/index.ts", "type": "module" }
+}
