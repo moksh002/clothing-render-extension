@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ProfileTab } from './ProfileTab';
+import { TryOnTab } from './TryOnTab';
 
 type Tab = 'profile' | 'tryon';
 
@@ -35,7 +36,7 @@ export function App() {
         {tab === 'profile' ? (
           <ProfileTab />
         ) : (
-          <p className="muted">Open a Target or Kmart top to see your fit here.</p>
+          <TryOnTab />
         )}
       </section>
     </main>

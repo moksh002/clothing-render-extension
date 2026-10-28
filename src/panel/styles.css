@@ -32,3 +32,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .actions button { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font: inherit; }
 .actions .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .status { color: #1c7c3b; }
+.tryon { display: grid; gap: 10px; }
+.tryon select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--card); }
+.note { margin: 0; padding: 6px 10px; background: #fff7e0; border-radius: 8px; color: #7a5b00; }
+.figure { width: 100%; max-height: 62vh; background: #fafbfc; border-radius: 10px; }
