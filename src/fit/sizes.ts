@@ -1,22 +1,21 @@
 import type { SizeChart, SizeRow } from '../types';
 
-const ALPHA = /^(\d*)(X*)(S|L|M)$/;
-
-/** Canonical alpha size: XXL and 2XL both become '2XL'; XXS becomes '2XS'. */
+/**
+ * Canonical alpha size. XXL and 2XL are the same size ('2XL'), and so are XXS and 2XS.
+ * Three or more X's stay literal: Target's men's chart lists XXXL (chest 120) and 3XL (chest 122)
+ * as different rows, so they must not be merged.
+ */
 function canonAlpha(s: string): string | null {
-  if (s === 'XS' || s === 'XL' || s === 'S' || s === 'M' || s === 'L') return s;
-  const m = ALPHA.exec(s);
-  if (!m) return null;
-  const [, digits, xs, base] = m;
-  if (base === 'M') return null;
-  const count = digits ? Number(digits) : xs.length;
-  if (count < 2) return null;
-  return `${count}X${base}`;
+  if (['XS', 'S', 'M', 'L', 'XL'].includes(s)) return s;
+  if (s === 'XXS') return '2XS';
+  if (s === 'XXL') return '2XL';
+  if (/^\d+X[SL]$/.test(s) || /^X{3,}[SL]$/.test(s)) return s;
+  return null;
 }
 
 /**
  * Split a raw size label into canonical tokens (FR-21).
- * 'XS/14' -> ['XS','14'], 'XXXL' -> ['3XL'], '16+' -> ['16'], '10P' -> ['10P'].
+ * 'XS/14' -> ['XS','14'], 'XXL' -> ['2XL'], 'XXXL' stays, '16+' -> ['16'], '10P' -> ['10P'].
  */
 export function sizeTokens(raw: string): string[] {
   const out = new Set<string>();
@@ -44,6 +43,8 @@ export function sortSizeLabels(labels: string[]): string[] {
     if (!alpha) return [2, 0];
     const xl = /^(\d+)XL$/.exec(alpha);
     if (xl) return [0, 10 + Number(xl[1])];
+    const many = /^(X{3,})L$/.exec(alpha);
+    if (many) return [0, 10 + many[1].length];
     const xs = /^(\d+)XS$/.exec(alpha);
     if (xs) return [0, -Number(xs[1])];
     const i = ALPHA_ORDER.indexOf(alpha);

@@ -45,6 +45,22 @@ export interface ChartSource {
   method: 'live' | 'rule' | 'snapshot' | 'manual';
   /** ISO date; snapshots carry 2026-10-28. */
   retrievedAt: string;
+  /** Which resolver step produced the chart (4 live, 5 rule, 6 snapshot, 7 manual). */
+  step: 4 | 5 | 6 | 7;
+}
+
+export interface ProductFacts {
+  store: StoreId;
+  url: string;
+  title: string;
+  brand?: string;
+  breadcrumb: string[];
+  sizeLabels: string[];
+  /** Raw fit lines, for example 'Regular fit'. */
+  fitText: string[];
+  /** All product feature bullets, used for sleeve style. */
+  features: string[];
+  modelSize?: string;
 }
 
 export interface Garment {
