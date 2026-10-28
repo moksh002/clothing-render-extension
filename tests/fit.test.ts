@@ -141,7 +141,8 @@ describe('size labels (FR-21)', () => {
   it('normalises labels to tokens', () => {
     expect(sizeTokens('XS/14').sort()).toEqual(['14', 'XS']);
     expect(sizeTokens('3XL')).toEqual(['3XL']);
-    expect(sizeTokens('XXXL')).toEqual(['3XL']);
+    expect(sizeTokens('XXXL')).toEqual(['XXXL']);
+    expect(sizeTokens('3XL')).toEqual(['3XL']);
     expect(sizeTokens('XXL')).toEqual(['2XL']);
     expect(sizeTokens('16+')).toEqual(['16']);
     expect(sizeTokens('10')).toEqual(['10']);
@@ -155,11 +156,14 @@ describe('size labels (FR-21)', () => {
         { label: '10', aliases: ['S'], chestCm: 91 },
         { label: '12', aliases: ['M'], chestCm: 96 },
         { label: '20', aliases: ['XXXL'], chestCm: 117 },
+        { label: '22', aliases: ['3XL'], chestCm: 122 },
       ],
     };
     expect(findRow(chart, 'S')!.label).toBe('10');
     expect(findRow(chart, 'M/12')!.label).toBe('12');
-    expect(findRow(chart, '3XL')!.label).toBe('20');
+    expect(findRow(chart, 'XXXL')!.label).toBe('20');
+    // XXXL and 3XL are different rows on Target's men's chart
+    expect(findRow(chart, '3XL')!.label).toBe('22');
     expect(findRow(chart, '10')!.label).toBe('10');
     expect(findRow(chart, 'XL')).toBeNull();
   });
