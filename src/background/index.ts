@@ -18,6 +18,33 @@ if (chrome.sidePanel?.setPanelBehavior) {
   });
 }
 
+// ---- Tab recognition -------------------------------------------------------------
+// The toolbar icon shows when the current page is a product the extension has recognised.
+function setBadge(tabId: number, state: PageState) {
+  let text = '';
+  let colour = '#1c7c3b';
+  let title = 'Virtual Fit';
+  if (state.kind === 'product') {
+    if (state.garment) {
+      text = '✓';
+      title = 'Virtual Fit: ready, open the panel to see the fit';
+    } else if (state.failure) {
+      text = '!';
+      colour = '#b26a00';
+      title = 'Virtual Fit: recognised, but the size chart needs pasting';
+    } else {
+      text = '…';
+      colour = '#5b6573';
+    }
+  } else if (state.kind === 'loading') {
+    text = '…';
+    colour = '#5b6573';
+  }
+  chrome.action.setBadgeText({ tabId, text }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ tabId, color: colour }).catch(() => {});
+  chrome.action.setTitle({ tabId, title }).catch(() => {});
+}
+
 // ---- Pasted links ---------------------------------------------------------------
 // A pasted product link is loaded in a background tab so the normal page pipeline (content script,
 // chart resolver, photo look) can run on it. Once it has produced a result the tab is closed.
@@ -67,6 +94,7 @@ chrome.runtime.onMessage.addListener((msg: PageMessage | LinkMessage, sender) =>
   }
   if (msg?.type === 'page-state' && sender.tab?.id != null) {
     const tabId = sender.tab.id;
+    setBadge(tabId, msg.state);
     chrome.storage.session.set({ [stateKey(tabId)]: msg.state }).then(async () => {
       const k = linkTabKey(tabId);
       const url = (await chrome.storage.session.get(k))[k] as string | undefined;

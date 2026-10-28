@@ -28,7 +28,7 @@ After pulling new code, run `npm run build` again and click the reload arrow on 
 4. The bottom of the tab shows which size chart was used and how it was read: `live` (from the store's own size guide), `snapshot` (saved copy, with a warning) or `manual`.
 5. If a chart cannot be read, or looks wrong, paste your own as CSV (a header row like `Size,Chest,Waist,Length`, then one row per size).
 
-Notes: values marked "estimated" are not in the store's chart (shoulder, length and sleeve are inferred). Kmart's popup does not say whether it lists body or garment sizes; the extension treats it as body sizes.
+Notes: the garment's shape comes from the store's size chart; its colour and print come from the photo (a flat front view, no fabric texture or drape). Values marked "estimated" are not in the store's chart (shoulder, length and sleeve are inferred). Kmart's popup does not say whether it lists body or garment sizes; the extension treats it as body sizes.
 
 ## Develop
 
