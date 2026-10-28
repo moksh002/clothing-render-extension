@@ -32,3 +32,19 @@ export async function loadSize(url: string): Promise<string | null> {
 }
 
 export const saveSize = (url: string, size: string) => chrome.storage.local.set({ [sizeKey(url)]: size });
+
+// A size chart the shopper pasted for one product.
+export interface ManualChart {
+  text: string;
+  basis: 'body' | 'garment';
+}
+const manualKey = (url: string) => `manual:${sizeKey(url)}`;
+
+export async function loadManualChart(url: string): Promise<ManualChart | null> {
+  const k = manualKey(url);
+  const r = await chrome.storage.local.get(k);
+  return (r[k] as ManualChart | undefined) ?? null;
+}
+
+export const saveManualChart = (url: string, m: ManualChart) => chrome.storage.local.set({ [manualKey(url)]: m });
+export const clearManualChart = (url: string) => chrome.storage.local.remove(manualKey(url));

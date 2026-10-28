@@ -53,3 +53,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .chip-oversized { background: #e8def8; color: #4b2a94; }
 .source p { margin: 4px 0; font-size: 12px; }
 .source a { color: var(--accent); }
+.paste { display: grid; gap: 8px; }
+.paste textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
+.paste textarea[aria-invalid='true'] { border-color: #d33; }
+.small { font-size: 12px; }
