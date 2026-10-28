@@ -18,6 +18,12 @@ async function waitUntil<T>(get: () => T | null | undefined | false, timeoutMs: 
 
 // ---- Adapter -------------------------------------------------------------
 
+/** The main product photo: the first gallery image, outside the "you may also like" tiles. */
+function kmartImageUrl(doc: Document): string | undefined {
+  const img = [...doc.querySelectorAll<HTMLImageElement>('img[data-testid=product-alt-image]')].find((i) => !i.closest('[data-testid=product-tile]'));
+  return img?.currentSrc || img?.getAttribute('src') || undefined;
+}
+
 const RELEVANT = /\bfit\b|relaxed|oversized|slim|loose|shoulder|sleeve|model (?:featured )?(?:is )?wearing/i;
 
 export const kmartAdapter: StoreAdapter = {
@@ -71,7 +77,7 @@ export const kmartAdapter: StoreAdapter = {
     };
     return {
       facts,
-      imageUrl: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? undefined,
+      imageUrl: kmartImageUrl(doc),
       sizeGuideEl: doc.querySelector('[data-testid=size-guide-btn]'),
     };
   },

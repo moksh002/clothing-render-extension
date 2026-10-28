@@ -62,6 +62,7 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
   const [size, setSize] = useState('');
   const [manual, setManual] = useState<ManualChart | null>(null);
   const [pasting, setPasting] = useState(false);
+  const [usePhoto, setUsePhoto] = useState(true);
 
   useEffect(() => {
     loadProfile().then(setProfile);
@@ -115,6 +116,9 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
     if (pageSize && labels.includes(pageSize)) setSize(pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageSize]);
+
+  const photoLook = product?.look;
+  const look = useMemo(() => (usePhoto && photoLook ? photoLook : undefined), [usePhoto, photoLook]);
 
   const fit = useMemo(
     () => (profile && garment && size ? computeFit(profile, garment, size) : null),
@@ -177,7 +181,14 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
 
       {fit && (
         <>
-          <FitFigure fit={fit} />
+          <FitFigure fit={fit} look={look} />
+          {photoLook && (
+            <label className="photo-look">
+              <input type="checkbox" checked={usePhoto} onChange={(e) => setUsePhoto(e.target.checked)} />
+              <span className="swatch" style={{ background: photoLook.colour }} aria-hidden="true" />
+              Use {photoLook.textureDataUrl ? 'colour and print' : 'colour'} from the product photo
+            </label>
+          )}
           <ul className="summary">
             {summarise(fit).map((l) => (
               <li key={l.region} className={`label-${l.label}`}>

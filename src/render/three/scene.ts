@@ -1,6 +1,7 @@
 import {
   AmbientLight,
   BufferGeometry,
+  CanvasTexture,
   CircleGeometry,
   Color,
   DirectionalLight,
@@ -12,6 +13,7 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   Scene,
+  SRGBColorSpace,
   SphereGeometry,
   WebGLRenderer,
 } from 'three';
@@ -24,6 +26,8 @@ export type View = 'front' | 'side' | 'back';
 /** Appearance of the garment. Defaults to a neutral colour. */
 export interface GarmentLook {
   colour?: string;
+  /** PNG data URL of the garment cut from the photo; shown on the front of the shirt. */
+  textureDataUrl?: string;
 }
 
 const SKIN = new Color('#e3c3a8');
@@ -32,8 +36,15 @@ const TIGHT = new Color('#e5736f');
 const SEGMENTS = 40;
 
 /** Loft elliptical rings (top to bottom) into a closed-around, vertex-coloured surface. */
-export function loftGeometry(rings: Ring[], base: Color, capEnds: boolean): BufferGeometry {
+export function loftGeometry(
+  rings: Ring[],
+  base: Color,
+  capEnds: boolean,
+  /** Optional planar UV for textured garments: maps a vertex to texture coordinates. */
+  uvOf?: (x: number, y: number, z: number, ring: Ring) => [number, number],
+): BufferGeometry {
   const pos: number[] = [];
+  const uvs: number[] = [];
   const col: number[] = [];
   const idx: number[] = [];
   const tint = new Color();
@@ -41,8 +52,11 @@ export function loftGeometry(rings: Ring[], base: Color, capEnds: boolean): Buff
     tint.copy(base).lerp(TIGHT, r.tint);
     for (let j = 0; j < SEGMENTS; j++) {
       const th = (j / SEGMENTS) * Math.PI * 2;
-      pos.push(r.cx + r.a * Math.cos(th), r.y, r.cz + r.b * Math.sin(th));
+      const vx = r.cx + r.a * Math.cos(th);
+      const vz = r.cz + r.b * Math.sin(th);
+      pos.push(vx, r.y, vz);
       col.push(tint.r, tint.g, tint.b);
+      if (uvOf) uvs.push(...uvOf(vx, r.y, vz, r));
     }
   }
   for (let i = 0; i < rings.length - 1; i++) {
@@ -62,6 +76,7 @@ export function loftGeometry(rings: Ring[], base: Color, capEnds: boolean): Buff
       pos.push(r.cx, r.y, r.cz);
       tint.copy(base).lerp(TIGHT, r.tint);
       col.push(tint.r, tint.g, tint.b);
+      if (uvOf) uvs.push(...uvOf(r.cx, r.y, r.cz, r));
       for (let j = 0; j < SEGMENTS; j++) {
         const a = ringIndex * SEGMENTS + j;
         const b = ringIndex * SEGMENTS + ((j + 1) % SEGMENTS);
@@ -72,6 +87,7 @@ export function loftGeometry(rings: Ring[], base: Color, capEnds: boolean): Buff
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new Float32BufferAttribute(col, 3));
+  if (uvOf) g.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
@@ -126,8 +142,26 @@ export class ThreeRenderer {
   update(fit: FitResult, look: GarmentLook = {}): void {
     this.clearFigure();
     const spec = buildFigure(fit);
-    const cloth = new Color(look.colour ?? NEUTRAL.getStyle());
-    for (const part of spec.parts) this.addPart(part, part.kind === 'garment' ? cloth : SKIN);
+    const textured = !!look.textureDataUrl;
+    // With a texture the vertex colour is white so the photo shows true (red still tints tight areas).
+    const cloth = textured ? new Color('#ffffff') : new Color(look.colour ?? NEUTRAL.getStyle());
+    this.setTexture(look.textureDataUrl);
+    const shirt = spec.parts.find((p) => p.name === 'shirt');
+    const maxA = shirt ? Math.max(...shirt.rings.map((r) => r.a)) : 20;
+    const top = shirt ? shirt.rings[0].y : 0;
+    const bottom = shirt ? shirt.rings[shirt.rings.length - 1].y : 0;
+    for (const part of spec.parts) {
+      let uvOf: ((x: number, y: number, z: number, ring: Ring) => [number, number]) | undefined;
+      if (textured && part.kind === 'garment') {
+        // The photo shows the front: project it straight onto the front of the shirt. The back and
+        // sleeves point at the texture's plain border texel, so they stay the garment colour.
+        const span = 2 * maxA * 1.2;
+        uvOf = part.name === 'shirt'
+          ? (x, y, z, ring) => (z >= ring.cz ? [0.5 + x / span, (y - bottom) / Math.max(1, top - bottom)] : [0.004, 0.004])
+          : () => [0.004, 0.004];
+      }
+      this.addPart(part, part.kind === 'garment' ? cloth : SKIN, uvOf);
+    }
     for (const blob of spec.blobs) {
       const m = new Mesh(new SphereGeometry(1, 24, 16), this.skin.clone());
       (m.material as MeshStandardMaterial).vertexColors = false;
@@ -167,13 +201,35 @@ export class ThreeRenderer {
     return this.renderer.domElement;
   }
 
-  private addPart(part: Part, base: Color): void {
+  private addPart(part: Part, base: Color, uvOf?: (x: number, y: number, z: number, ring: Ring) => [number, number]): void {
     const g = new Group();
     g.position.set(part.origin.x, part.origin.y, 0);
     g.rotation.z = part.rotZ;
-    const mesh = new Mesh(loftGeometry(part.rings, base, part.kind === 'body'), part.kind === 'garment' ? this.cloth : this.skin);
+    const mesh = new Mesh(loftGeometry(part.rings, base, part.kind === 'body', uvOf), part.kind === 'garment' ? this.cloth : this.skin);
     g.add(mesh);
     this.figure.add(g);
+  }
+
+  private textureUrl: string | undefined;
+
+  private setTexture(url: string | undefined): void {
+    if (url === this.textureUrl) return;
+    this.textureUrl = url;
+    const old = this.cloth.map;
+    this.cloth.map = null;
+    this.cloth.needsUpdate = true;
+    old?.dispose();
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => {
+      if (this.textureUrl !== url) return; // replaced meanwhile
+      const tex = new CanvasTexture(img);
+      tex.colorSpace = SRGBColorSpace;
+      this.cloth.map = tex;
+      this.cloth.needsUpdate = true;
+      this.requestRender();
+    };
+    img.src = url;
   }
 
   private clearFigure(): void {

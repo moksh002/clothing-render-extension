@@ -63,3 +63,5 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .figure3d:active { cursor: grabbing; }
 .figure-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .figure-bar .segmented button { padding: 4px 10px; font-size: 12px; }
+.photo-look { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.2); display: inline-block; }

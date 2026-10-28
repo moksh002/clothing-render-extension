@@ -66,7 +66,9 @@ describe('Target product facts (FR-19)', () => {
 
   it('reads the product image and the size guide trigger', () => {
     const r = targetAdapter.extract(load(PAGES.T1.file), new URL(PAGES.T1.url))!;
-    expect(r.imageUrl).toMatch(/assets\.target\.com\.au/);
+    expect(r.imageUrl).toMatch(/assets\.target\.com\.au\/transform\//);
+    // asks for a small size, not the page's 1400x1600
+    expect(r.imageUrl).toContain('width%3A320%2Cheight%3A400');
     expect(r.sizeGuideEl?.getAttribute('data-testid')).toBe('size-guide-link');
   });
 });
