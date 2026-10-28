@@ -4,4 +4,4 @@ dist/
 *.log
 .vite/
 tests/.playwright/
-"Virtual Fit Extension MVP Spec.md"
+Virtual\ Fit\ Extension\ MVP\ Spec.md
