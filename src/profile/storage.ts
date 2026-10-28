@@ -18,3 +18,17 @@ export async function loadUnit(): Promise<Unit> {
 }
 
 export const saveUnit = (u: Unit) => chrome.storage.local.set({ [UNIT_KEY]: u });
+
+// Last used size per product (FR-16). Keyed by store + path, ignoring query strings.
+const sizeKey = (url: string) => {
+  const u = new URL(url);
+  return `size:${u.hostname}${u.pathname}`;
+};
+
+export async function loadSize(url: string): Promise<string | null> {
+  const k = sizeKey(url);
+  const r = await chrome.storage.local.get(k);
+  return (r[k] as string | undefined) ?? null;
+}
+
+export const saveSize = (url: string, size: string) => chrome.storage.local.set({ [sizeKey(url)]: size });

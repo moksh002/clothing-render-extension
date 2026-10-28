@@ -36,3 +36,20 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .tryon select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--card); }
 .note { margin: 0; padding: 6px 10px; background: #fff7e0; border-radius: 8px; color: #7a5b00; }
 .figure { width: 100%; max-height: 62vh; background: #fafbfc; border-radius: 10px; }
+.product-title { margin: 0; font-size: 15px; line-height: 1.3; }
+.empty { margin: 0; padding: 8px 0; color: var(--muted); }
+.warn { margin: 0; padding: 6px 10px; background: #fdecea; border-radius: 8px; color: #8a1f17; }
+.link { border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
+.summary { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.summary li { display: grid; grid-template-columns: 82px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.s-title { font-weight: 600; }
+.s-text em { color: var(--muted); font-style: normal; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eef1f5; }
+.chip:empty { display: none; }
+.chip-tight { background: #fde0de; color: #8a1f17; }
+.chip-fitted { background: #fff0cc; color: #6b4e00; }
+.chip-true { background: #d9f2e1; color: #176034; }
+.chip-loose { background: #dbe8fb; color: #1d4a99; }
+.chip-oversized { background: #e8def8; color: #4b2a94; }
+.source p { margin: 4px 0; font-size: 12px; }
+.source a { color: var(--accent); }
