@@ -318,10 +318,17 @@ export function buildFigure(fit: FitResult): FigureSpec {
     [WAIST * H, gStraightWaist],
   ];
   for (const [y, circ] of candidates) if (y > hemY + 4) controls.push(shell(y, circ));
+  // Everything from the shoulders to the chest takes the chest's tint, so a tight top is one red
+  // area rather than bands (the rings in between are not individually measured).
+  const chestRing = controls.find((r) => Math.abs(r.y - CHEST * H) < 0.5);
+  if (chestRing) for (const r of controls) if (r.y >= chestRing.y - 0.5 && r !== controls[0]) r.tint = chestRing.tint;
+  // The torso between chest and waist is tight if the waist is, even though its rings are drawn straight.
+  if (fit.label.waist === 'tight') for (const r of controls) if (r !== controls[0]) r.tint = Math.max(r.tint, 1);
   // Below the waist the body widens to the hips; add rings so the shell never sinks into it.
   const hemCirc = Math.max(gStraightWaist, g.chestCm * 0.98);
   for (let y = WAIST * H - 8; y > hemY + 3; y -= 8) controls.push(shell(y, hemCirc));
   controls.push(shell(hemY, hemCirc));
+  if (fit.label.waist === 'tight') for (const r of controls) if (r !== controls[0]) r.tint = 1;
   parts.push({ name: 'shirt', kind: 'garment', rings: smoothRings(controls, 4), origin: { x: 0, y: 0 }, rotZ: 0 });
   void bodyPerimeterAt;
 

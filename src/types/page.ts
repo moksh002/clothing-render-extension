@@ -30,3 +30,14 @@ export type PageState =
 export type PageMessage = { type: 'page-state'; state: PageState };
 
 export const stateKey = (tabId: number) => `pageState:${tabId}`;
+
+/** Result of loading a pasted product link in a background tab. */
+export type LinkResult =
+  | { status: 'loading' }
+  | { status: 'done'; state: PageState }
+  | { status: 'error'; message: string };
+
+export type LinkMessage = { type: 'open-link'; url: string };
+
+export const linkResultKey = (url: string) => `linkResult:${url}`;
+export const linkTabKey = (tabId: number) => `linkTab:${tabId}`;
