@@ -36,7 +36,7 @@ export function App() {
         {tab === 'profile' ? (
           <ProfileTab />
         ) : (
-          <TryOnTab />
+          <TryOnTab goProfile={() => setTab('profile')} />
         )}
       </section>
     </main>

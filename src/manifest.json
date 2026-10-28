@@ -4,8 +4,16 @@
   "version": "0.1.0",
   "description": "See how a top fits your measurements on Target AU and Kmart AU product pages.",
   "minimum_chrome_version": "114",
-  "permissions": ["storage", "sidePanel", "activeTab"],
+  "permissions": ["storage", "sidePanel"],
+  "host_permissions": ["https://*.target.com.au/*", "https://*.myer.com.au/*"],
   "action": { "default_title": "Open Virtual Fit" },
   "side_panel": { "default_path": "src/panel/index.html" },
-  "background": { "service_worker": "src/background/index.ts", "type": "module" }
+  "background": { "service_worker": "src/background/index.ts", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.target.com.au/*", "https://*.myer.com.au/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ]
 }

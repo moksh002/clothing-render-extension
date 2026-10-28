@@ -67,8 +67,8 @@ export const FLAT_CHEST_MAX_CM = 80;
 /** Hem position from garment length / torso length. Upper bounds, ascending. */
 export const HEM_LANDMARKS: [number, 'waist' | 'hip' | 'upper-thigh' | 'mid-thigh'][] = [
   [0.8, 'waist'],
-  [1.1, 'hip'],
-  [1.45, 'upper-thigh'],
+  [1.45, 'hip'],
+  [1.8, 'upper-thigh'],
   [Infinity, 'mid-thigh'],
 ];
 

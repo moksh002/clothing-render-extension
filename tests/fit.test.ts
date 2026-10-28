@@ -112,8 +112,9 @@ describe('hem and sleeve positions', () => {
     // torso = 54
     expect(at(35)).toBe('waist');
     expect(at(54)).toBe('hip');
-    expect(at(70)).toBe('upper-thigh');
-    expect(at(90)).toBe('mid-thigh');
+    expect(at(70)).toBe('hip');
+    expect(at(85)).toBe('upper-thigh');
+    expect(at(110)).toBe('mid-thigh');
   });
 
   it('places the sleeve end by sleeve / arm length', () => {
