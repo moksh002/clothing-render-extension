@@ -26,7 +26,8 @@ import {
 } from './fit-config';
 import { findRow } from './sizes';
 
-type BodyInput = Omit<BodyProfile, 'shoulderCm' | 'inseamCm'> &
+type BodyInput = Omit<BodyProfile, 'shoulderCm' | 'inseamCm' | 'weightKg'> &
+  Partial<Pick<BodyProfile, 'weightKg'>> &
   Partial<Pick<BodyProfile, 'shoulderCm' | 'inseamCm'>>;
 
 /** FR-4: fill in dimensions the user did not give from height and gender. */
@@ -34,6 +35,7 @@ export function deriveBody(p: BodyInput): BodyDims {
   return {
     gender: p.gender,
     heightCm: p.heightCm,
+    weightKg: p.weightKg ?? 22 * (p.heightCm / 100) ** 2,
     chestCm: p.chestCm,
     waistCm: p.waistCm,
     hipsCm: p.hipsCm,

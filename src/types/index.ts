@@ -87,6 +87,7 @@ export type BodyLandmark =
 export interface BodyDims {
   gender: Gender;
   heightCm: number;
+  weightKg: number;
   chestCm: number;
   waistCm: number;
   hipsCm: number;

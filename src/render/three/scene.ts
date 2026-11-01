@@ -4,12 +4,14 @@ import {
   CanvasTexture,
   CircleGeometry,
   Color,
+  CanvasTexture as CanvasTex,
   DirectionalLight,
   DoubleSide,
   Float32BufferAttribute,
   Group,
   HemisphereLight,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   PerspectiveCamera,
   Scene,
@@ -19,6 +21,8 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { FitResult } from '../../types';
+import { buildBodyGarment } from '../body/garment';
+import { bodyMeshData, eyeData, getBodyFit, type EyeData } from '../body/model';
 import { buildFigure, type Part, type Ring } from './figure';
 
 export type View = 'front' | 'side' | 'back';
@@ -32,8 +36,9 @@ export interface GarmentLook {
 
 const SKIN = new Color('#e3c3a8');
 const NEUTRAL = new Color('#aab8d4');
+const UNDERWEAR = new Color('#262830');
 const TIGHT = new Color('#e5736f');
-const SEGMENTS = 40;
+const DEFAULT_SEGMENTS = 40;
 
 /** Loft elliptical rings (top to bottom) into a closed-around, vertex-coloured surface. */
 export function loftGeometry(
@@ -48,12 +53,13 @@ export function loftGeometry(
   const col: number[] = [];
   const idx: number[] = [];
   const tint = new Color();
+  const SEGMENTS = rings[0].radii?.length ?? DEFAULT_SEGMENTS;
   for (const r of rings) {
     tint.copy(base).lerp(TIGHT, r.tint);
     for (let j = 0; j < SEGMENTS; j++) {
       const th = (j / SEGMENTS) * Math.PI * 2;
-      const vx = r.cx + r.a * Math.cos(th);
-      const vz = r.cz + r.b * Math.sin(th);
+      const vx = r.cx + (r.radii ? r.radii[j] : r.a) * Math.cos(th);
+      const vz = r.cz + (r.radii ? r.radii[j] : r.b) * Math.sin(th);
       pos.push(vx, r.y, vz);
       col.push(tint.r, tint.g, tint.b);
       if (uvOf) uvs.push(...uvOf(vx, r.y, vz, r));
@@ -139,43 +145,103 @@ export class ThreeRenderer {
     this.resize();
   }
 
-  update(fit: FitResult, look: GarmentLook = {}): void {
+  private token = 0;
+
+  /** Draw the figure for a fit. Fitting the real body takes a moment, so this is asynchronous. */
+  async update(fit: FitResult, look: GarmentLook = {}): Promise<void> {
+    const token = ++this.token;
+    const bf = await getBodyFit(fit.body);
+    if (token !== this.token) return; // a newer update superseded this one
     this.clearFigure();
-    const spec = buildFigure(fit);
+
+    const procedural = bf ? null : buildFigure(fit);
+    const parts = bf ? buildBodyGarment(fit, bf).parts : procedural!.parts;
     const textured = !!look.textureDataUrl;
     // With a texture the vertex colour is white so the photo shows true (red still tints tight areas).
     const cloth = textured ? new Color('#ffffff') : new Color(look.colour ?? NEUTRAL.getStyle());
     this.setTexture(look.textureDataUrl);
-    const shirt = spec.parts.find((p) => p.name === 'shirt');
+
+    if (bf) this.addBodyMesh(bf);
+    const shirt = parts.find((p) => p.name === 'shirt');
     const maxA = shirt ? Math.max(...shirt.rings.map((r) => r.a)) : 20;
     const top = shirt ? shirt.rings[0].y : 0;
     const bottom = shirt ? shirt.rings[shirt.rings.length - 1].y : 0;
-    for (const part of spec.parts) {
+    for (const part of parts) {
+      if (bf && part.kind === 'body') continue;
       let uvOf: ((x: number, y: number, z: number, ring: Ring) => [number, number]) | undefined;
       if (textured && part.kind === 'garment') {
         // The photo shows the front: project it straight onto the front of the shirt. The back and
         // sleeves point at the texture's plain border texel, so they stay the garment colour.
         const span = 2 * maxA * 1.2;
         uvOf = part.name === 'shirt'
-          ? (x, y, z, ring) => (z >= ring.cz ? [0.5 + x / span, (y - bottom) / Math.max(1, top - bottom)] : [0.004, 0.004])
+          ? (x, y, z, ring) => (z >= ring.cz ? [0.5 + (x - ring.cx) / span, (y - bottom) / Math.max(1, top - bottom)] : [0.004, 0.004])
           : () => [0.004, 0.004];
       }
       this.addPart(part, part.kind === 'garment' ? cloth : SKIN, uvOf);
     }
-    for (const blob of spec.blobs) {
-      const m = new Mesh(new SphereGeometry(1, 24, 16), this.skin.clone());
-      (m.material as MeshStandardMaterial).vertexColors = false;
-      (m.material as MeshStandardMaterial).color = SKIN.clone();
-      m.scale.set(blob.radii.x, blob.radii.y, blob.radii.z);
-      m.position.set(blob.center.x, blob.center.y, blob.center.z);
-      if (blob.rotZ) m.rotation.z = blob.rotZ;
-      this.figure.add(m);
+    if (procedural) {
+      for (const blob of procedural.blobs) {
+        const m = new Mesh(new SphereGeometry(1, 24, 16), this.skin.clone());
+        (m.material as MeshStandardMaterial).vertexColors = false;
+        (m.material as MeshStandardMaterial).color = SKIN.clone();
+        m.scale.set(blob.radii.x, blob.radii.y, blob.radii.z);
+        m.position.set(blob.center.x, blob.center.y, blob.center.z);
+        if (blob.rotZ) m.rotation.z = blob.rotZ;
+        this.figure.add(m);
+      }
     }
-    if (spec.heightCm !== this.height) {
-      this.height = spec.heightCm;
+    const h = fit.body.heightCm;
+    if (h !== this.height) {
+      this.height = h;
       this.frame();
     }
     this.requestRender();
+  }
+
+  private addBodyMesh(bf: Parameters<typeof bodyMeshData>[0]): void {
+    const d = bodyMeshData(bf);
+    const g = new BufferGeometry();
+    g.setAttribute('position', new Float32BufferAttribute(d.positions, 3));
+    g.setAttribute('normal', new Float32BufferAttribute(d.normals, 3));
+    g.setAttribute('uv', new Float32BufferAttribute(d.uvs, 2));
+    g.setIndex(Array.from(d.index));
+    const mat = new MeshPhysicalMaterial({ color: SKIN, roughness: 0.55, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.5, sheen: 0.4, sheenColor: new Color('#ffd9c2'), sheenRoughness: 0.5 });
+    this.figure.add(new Mesh(g, mat));
+    const eyes = eyeData(bf);
+    for (const side of [eyes.left, eyes.right]) this.addEye(side);
+  }
+
+  private irisTexture: CanvasTexture | null = null;
+
+  private addEye(e: EyeData): void {
+    const g = new BufferGeometry();
+    g.setAttribute('position', new Float32BufferAttribute(e.positions, 3));
+    g.setIndex(Array.from(e.index));
+    g.computeVertexNormals();
+    this.figure.add(new Mesh(g, new MeshPhysicalMaterial({ color: '#f3f1ee', roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.05 })));
+
+    if (!this.irisTexture) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const x = c.getContext('2d')!;
+      const grad = x.createRadialGradient(64, 64, 4, 64, 64, 62);
+      grad.addColorStop(0, '#0b0b0d');
+      grad.addColorStop(0.28, '#0b0b0d');
+      grad.addColorStop(0.3, '#6b4a2b');
+      grad.addColorStop(0.75, '#8a6238');
+      grad.addColorStop(0.92, '#2b1f14');
+      grad.addColorStop(1, 'rgba(43,31,20,0)');
+      x.fillStyle = grad;
+      x.fillRect(0, 0, 128, 128);
+      this.irisTexture = new CanvasTex(c);
+      this.irisTexture.colorSpace = SRGBColorSpace;
+    }
+    const iris = new Mesh(
+      new CircleGeometry(e.radius * 0.52, 32),
+      new MeshPhysicalMaterial({ map: this.irisTexture, transparent: true, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.05 }),
+    );
+    iris.position.set(e.centre[0], e.centre[1], e.centre[2] + e.radius * 0.97);
+    this.figure.add(iris);
   }
 
   setView(view: View): void {
@@ -201,11 +267,17 @@ export class ThreeRenderer {
     return this.renderer.domElement;
   }
 
+  private under = new MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: DoubleSide });
+
   private addPart(part: Part, base: Color, uvOf?: (x: number, y: number, z: number, ring: Ring) => [number, number]): void {
     const g = new Group();
     g.position.set(part.origin.x, part.origin.y, 0);
     g.rotation.z = part.rotZ;
-    const mesh = new Mesh(loftGeometry(part.rings, base, part.kind === 'body', uvOf), part.kind === 'garment' ? this.cloth : this.skin);
+    const under = part.style === 'underwear';
+    const mesh = new Mesh(
+      loftGeometry(part.rings, under ? UNDERWEAR : base, part.kind === 'body' || part.name === 'briefs', under ? undefined : uvOf),
+      under ? this.under : part.kind === 'garment' ? this.cloth : this.skin,
+    );
     g.add(mesh);
     this.figure.add(g);
   }
@@ -238,7 +310,7 @@ export class ThreeRenderer {
       child.traverse((o) => {
         if (o instanceof Mesh) {
           o.geometry.dispose();
-          if (o.material !== this.skin && o.material !== this.cloth) (o.material as MeshStandardMaterial).dispose();
+          if (o.material !== this.skin && o.material !== this.cloth && o.material !== this.under) (o.material as MeshStandardMaterial).dispose();
         }
       });
     }

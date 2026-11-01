@@ -9,6 +9,8 @@ export interface Ring {
   /** Half width (x) and half depth (z) of the elliptical cross-section. */
   a: number;
   b: number;
+  /** Polar radii around (cx, cz), evenly spaced in angle. When present they replace the ellipse (a, b). */
+  radii?: number[];
   /** 0..1, how red the garment is at this ring (tight). */
   tint: number;
 }
@@ -16,6 +18,8 @@ export interface Ring {
 export interface Part {
   name: string;
   kind: 'body' | 'garment';
+  /** Underwear is drawn plain, never with the product's colour or print. */
+  style?: 'underwear';
   rings: Ring[];
   /** Part-local coordinates are rotated about the z axis by `rotZ` and moved to `origin`. */
   origin: { x: number; y: number };
@@ -95,6 +99,9 @@ export function smoothRings(rings: Ring[], sub = 4): Ring[] {
         a: Math.max(0.1, cr(p0.a, p1.a, p2.a, p3.a, t)),
         b: Math.max(0.1, cr(p0.b, p1.b, p2.b, p3.b, t)),
         tint: clamp(cr(p0.tint, p1.tint, p2.tint, p3.tint, t), 0, 1),
+        ...(p1.radii && p2.radii && p0.radii && p3.radii
+          ? { radii: p1.radii.map((_, k) => Math.max(0.1, cr(p0.radii![k], p1.radii![k], p2.radii![k], p3.radii![k], t))) }
+          : {}),
       });
     }
   }
