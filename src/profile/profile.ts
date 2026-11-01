@@ -1,4 +1,4 @@
-import type { BodyProfile } from '../types';
+import type { BodyProfile, Gender } from '../types';
 
 export type MeasurementKey = Exclude<keyof BodyProfile, 'gender'>;
 export type Unit = 'cm' | 'in';
@@ -87,3 +87,17 @@ export const TEST_PROFILE: BodyProfile = {
   shoulderCm: 44,
   inseamCm: 77,
 };
+
+/** The same made-up build for a woman: 170 cm, average, a slightly bigger belly than usual. */
+export const TEST_PROFILE_WOMEN: BodyProfile = {
+  gender: 'women',
+  heightCm: 170,
+  weightKg: 74,
+  chestCm: 94,
+  waistCm: 84,
+  hipsCm: 102,
+  shoulderCm: 39,
+  inseamCm: 78,
+};
+
+export const TEST_PROFILES: Record<Gender, BodyProfile> = { men: TEST_PROFILE, women: TEST_PROFILE_WOMEN };

@@ -73,3 +73,5 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .poses { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; color: var(--muted); }
 .chip-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.model-gender { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.model-gender .segmented button { padding: 4px 12px; font-size: 12px; }

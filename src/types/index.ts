@@ -76,6 +76,8 @@ export interface GarmentDetail {
 
 export interface Garment {
   title: string;
+  /** Who the product is cut for; defaults to the wearer's gender. */
+  gender?: Gender;
   imageUrl?: string;
   chart: SizeChart;
   styleEase?: StyleEase;
