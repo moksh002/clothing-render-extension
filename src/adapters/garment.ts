@@ -1,3 +1,4 @@
+import { detailFromFacts } from '../fit/detail';
 import { sleeveStyleFromText, styleEaseFromText } from '../fit/style';
 import type { Garment, ProductFacts, SizeChart } from '../types';
 
@@ -9,5 +10,6 @@ export function buildGarment(facts: ProductFacts, chart: SizeChart, imageUrl?: s
     ...(imageUrl ? { imageUrl } : {}),
     styleEase: styleEaseFromText([...facts.fitText, facts.title]),
     sleeveStyle: sleeveStyleFromText([facts.title, ...facts.features]),
+    detail: detailFromFacts(facts),
   };
 }

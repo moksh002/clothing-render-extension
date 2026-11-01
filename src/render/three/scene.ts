@@ -4,6 +4,10 @@ import {
   CanvasTexture,
   CircleGeometry,
   Color,
+  EdgesGeometry,
+  LineBasicMaterial,
+  LineSegments,
+  PlaneGeometry,
   CanvasTexture as CanvasTex,
   DirectionalLight,
   DoubleSide,
@@ -22,7 +26,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { FitResult } from '../../types';
-import { buildBodyGarment } from '../body/garment';
+import { buildBodyGarment, type Decorations } from '../body/garment';
 import { bodyMeshData, eyeData, getBodyFit, type EyeData } from '../body/model';
 import { buildFigure, type Part, type Ring } from './figure';
 
@@ -70,8 +74,10 @@ export function loftGeometry(
     tint.copy(base).lerp(TIGHT, r.tint);
     for (let j = 0; j < SEGMENTS; j++) {
       const th = (j / SEGMENTS) * Math.PI * 2;
-      pos.push(r.cx + (r.radii ? r.radii[j] : r.a) * Math.cos(th), r.y, r.cz + (r.radii ? r.radii[j] : r.b) * Math.sin(th));
-      col.push(tint.r, tint.g, tint.b);
+      pos.push(r.cx + (r.radii ? r.radii[j] : r.a) * Math.cos(th), r.ys ? r.ys[j] : r.y, r.cz + (r.radii ? r.radii[j] : r.b) * Math.sin(th));
+      const w = r.trim?.[j] ?? 0;
+      if (w > 0) col.push(tint.r * (1 - 0.18 * w), tint.g * (1 - 0.18 * w), tint.b * (1 - 0.18 * w));
+      else col.push(tint.r, tint.g, tint.b);
       ringOf.push(ri);
       segOf.push(j);
     }
@@ -199,7 +205,8 @@ export class ThreeRenderer {
     this.clearFigure();
 
     const procedural = bf ? null : buildFigure(fit);
-    const parts = bf ? buildBodyGarment(fit, bf).parts : procedural!.parts;
+    const built = bf ? buildBodyGarment(fit, bf) : null;
+    const parts = built ? built.parts : procedural!.parts;
     const textured = !!look.textureDataUrl;
     // With a texture the vertex colour is white so the photo shows true (red still tints tight areas).
     const cloth = textured ? new Color('#ffffff') : new Color(look.colour ?? NEUTRAL.getStyle());
@@ -232,6 +239,7 @@ export class ThreeRenderer {
       }
       this.addPart(part, part.kind === 'garment' ? cloth : SKIN, uvOf);
     }
+    if (built) this.addDecorations(built.decorations, look.colour ?? NEUTRAL.getStyle());
     if (procedural) {
       for (const blob of procedural.blobs) {
         const m = new Mesh(new SphereGeometry(1, 24, 16), this.skin.clone());
@@ -249,6 +257,29 @@ export class ThreeRenderer {
       this.frame();
     }
     this.requestRender();
+  }
+
+  private addDecorations(d: Decorations, colour: string): void {
+    const base = new Color(colour);
+    const dark = base.getHSL({ h: 0, s: 0, l: 0 }).l < 0.35;
+    const buttonMat = new MeshStandardMaterial({ color: dark ? '#d9d5cc' : '#3d342b', roughness: 0.35 });
+    for (const [x, y, z] of d.buttons) {
+      const m = new Mesh(new SphereGeometry(0.62, 16, 12), buttonMat);
+      m.scale.set(1, 1, 0.45);
+      m.position.set(x, y, z);
+      this.figure.add(m);
+    }
+    for (const p of d.pockets) {
+      const mat = new MeshStandardMaterial({ color: base.clone().multiplyScalar(0.9), roughness: 0.95, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+      const m = new Mesh(new PlaneGeometry(p.w, p.h), mat);
+      m.position.set(...p.pos);
+      m.rotation.y = Math.atan2(p.nx, p.nz);
+      this.figure.add(m);
+      const edge = new LineSegments(new EdgesGeometry(m.geometry), new LineBasicMaterial({ color: base.clone().multiplyScalar(0.55) }));
+      edge.position.copy(m.position);
+      edge.rotation.copy(m.rotation);
+      this.figure.add(edge);
+    }
   }
 
   private addBodyMesh(bf: Parameters<typeof bodyMeshData>[0]): void {
@@ -388,6 +419,9 @@ export class ThreeRenderer {
         if (o instanceof Mesh) {
           o.geometry.dispose();
           if (o.material !== this.skin && o.material !== this.cloth && o.material !== this.under) (o.material as MeshStandardMaterial).dispose();
+        } else if (o instanceof LineSegments) {
+          o.geometry.dispose();
+          (o.material as LineBasicMaterial).dispose();
         }
       });
     }
