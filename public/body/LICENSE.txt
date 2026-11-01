@@ -1,0 +1,4 @@
+The files in this folder are derived from the MakeHuman base mesh and targets
+(https://github.com/makehumancommunity/makehuman, makehuman/data), which the MakeHuman project
+released under CC0 1.0 Universal (see LICENSE.md section C and LICENSE.ASSETS.md in that repository).
+Converted to compact binaries by scripts/build-body.ts.
