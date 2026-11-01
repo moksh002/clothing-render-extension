@@ -63,12 +63,24 @@ export interface ProductFacts {
   modelSize?: string;
 }
 
+export type Neckline = 'crew' | 'v' | 'scoop' | 'boat' | 'collar' | 'henley';
+
+/** Style details read from the product text. */
+export interface GarmentDetail {
+  neckline: Neckline;
+  /** Buttons down the front (a shirt) or on a short placket (polo, henley). */
+  buttons: 'none' | 'placket' | 'full';
+  cuffs: boolean;
+  pocket: boolean;
+}
+
 export interface Garment {
   title: string;
   imageUrl?: string;
   chart: SizeChart;
   styleEase?: StyleEase;
   sleeveStyle?: SleeveStyle;
+  detail?: GarmentDetail;
 }
 
 /** Positions on the body where a hem or sleeve can end, top to bottom. */
@@ -104,6 +116,7 @@ export interface GarmentDims {
   convention: ChartConvention;
   styleEase: StyleEase;
   sleeveStyle: SleeveStyle;
+  detail: GarmentDetail;
   chestCm: number;
   waistCm: number;
   shoulderCm: number;

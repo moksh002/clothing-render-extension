@@ -1,6 +1,6 @@
 // Garment shell built from cross-sections of the real body mesh, so it follows the actual shape
 // (bust, back, thighs, arms) instead of an ellipse. Units are cm, y up, figure faces +z.
-import type { FitResult } from '../../types';
+import type { FitResult, Neckline } from '../../types';
 import type { Part, Ring } from '../three/figure';
 import { smoothRings } from '../three/figure';
 import type { BodyFit } from './fit';
@@ -101,9 +101,27 @@ export function shellRing(y: number, loop: Loop, C: number, gap = GAP, widen = 1
   return { y, cx, cz, a: max, b: max, radii, tint: C < loop.perimeter - 0.05 ? 1 : 0 };
 }
 
+export interface Decorations {
+  /** Button centres, cm. */
+  buttons: [number, number, number][];
+  /** Flat patches on the cloth: centre, outward direction in x/z, size. */
+  pockets: { pos: [number, number, number]; nx: number; nz: number; w: number; h: number }[];
+}
+
 export interface BodyGarment {
   parts: Part[];
+  decorations: Decorations;
 }
+
+/** How each neckline is cut: front and back drop below the neck line, and how narrow the front dip is. */
+const NECKLINES: Record<Neckline, { front: number; back: number; power: number; raise: number; rib: number }> = {
+  crew: { front: 3.2, back: 0.8, power: 3, raise: 0, rib: 1.3 },
+  scoop: { front: 8.5, back: 1.2, power: 2, raise: 0, rib: 1.3 },
+  v: { front: 14, back: 1, power: 14, raise: 0, rib: 1.3 },
+  boat: { front: 2.2, back: 1.4, power: 1, raise: 0, rib: 1.1 },
+  collar: { front: 9, back: 0, power: 16, raise: 2.4, rib: 0 },
+  henley: { front: 5, back: 0.8, power: 6, raise: 0, rib: 1.3 },
+};
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = clamp((x - a) / (b - a), 0, 1);
@@ -128,15 +146,17 @@ export function buildBodyGarment(fit: FitResult, bf: BodyFit): BodyGarment {
   const neckBaseY = 0.818 * H;
   const hemY = Math.max(neckBaseY - g.lengthCm, 0.3 * H);
   const widenMax = clamp(g.shoulderCm / m.shoulderCm, 1, 1.3);
+  const cut = NECKLINES[g.detail.neckline];
 
   // Target circumference along the height, piecewise linear between control levels.
   const neckY = 0.842 * H;
+  const topY = neckY + cut.raise;
   const neck = section(neckY);
   const shoulderSection = section(m.shoulderY);
   const straightWaist = Math.max(g.waistCm, g.chestCm * 0.92);
   const hemCirc = Math.max(straightWaist, g.chestCm * 0.98);
   const controls: [number, number][] = [
-    [neckY, neck.perimeter + 2 * Math.PI * 1.6],
+    [topY, neck.perimeter + 2 * Math.PI * 1.6],
     [m.shoulderY, Math.max(g.chestCm * 0.95, shoulderSection.perimeter)],
     [m.chestY, g.chestCm],
     [m.waistY, straightWaist],
@@ -160,13 +180,42 @@ export function buildBodyGarment(fit: FitResult, bf: BodyFit): BodyGarment {
 
   // Dense rings, each taken from the body's own section at that height, so the cloth always sits outside it.
   const rings: Ring[] = [];
-  for (let y = neckY; y > hemY; y -= y > m.chestY ? 1.5 : 2.5) rings.push(ringAt(y));
-  rings.push(ringAt(hemY));
   function ringAt(y: number): Ring {
     const widen = 1 + (widenMax - 1) * smoothstep(m.chestY, m.shoulderY, y);
     const r = shellRing(y, section(y), targetC(y), y > m.shoulderY ? GAP + 1.1 : y > m.chestY ? GAP + 0.7 : GAP, widen);
     r.tint = tintAt(y);
     return r;
+  }
+  for (let y = topY; y > hemY; y -= y > m.chestY ? 1.5 : 2.5) rings.push(ringAt(y));
+  rings.push(ringAt(hemY));
+
+  // ---- neckline: cut the top edge lower at the front (and a little at the back) ----
+  const N = POLAR;
+  const edgeY = (j: number) => {
+    const th = (j / N) * Math.PI * 2;
+    const front = Math.max(0, Math.sin(th)) ** cut.power; // +z is the front
+    const back = Math.max(0, -Math.sin(th)) ** 2;
+    return topY - (cut.back * back + (cut.back + (cut.front - cut.back) * front) * (1 - back));
+  };
+  const radiusAt = (j: number, y: number) => {
+    for (let i = 1; i < rings.length; i++) {
+      if (y >= rings[i].y) {
+        const t = (y - rings[i].y) / Math.max(1e-6, rings[i - 1].y - rings[i].y);
+        return lerp(rings[i].radii![j], rings[i - 1].radii![j], t);
+      }
+    }
+    return rings[rings.length - 1].radii![j];
+  };
+  for (const r of rings) {
+    r.ys = Array.from({ length: N }, (_, j) => Math.min(r.y, edgeY(j)));
+    r.radii = r.radii!.map((v, j) => (r.y > edgeY(j) ? radiusAt(j, edgeY(j)) : v));
+    // Rib band along the cut edge, and a slightly darker hem.
+    r.trim = Array.from({ length: N }, (_, j) => {
+      const below = edgeY(j) - r.y;
+      const rib = cut.rib > 0 && below <= cut.rib ? 1 : 0;
+      const hem = r.y - hemY < 1.1 ? 0.7 : 0;
+      return Math.max(rib, hem);
+    });
   }
   parts.push({ name: 'shirt', kind: 'garment', rings, origin: { x: 0, y: 0 }, rotZ: 0 });
 
@@ -178,7 +227,51 @@ export function buildBodyGarment(fit: FitResult, bf: BodyFit): BodyGarment {
   }
   // Briefs only matter where the top leaves the hips bare; under a long top they would just z-fight with it.
   if (hemY > m.crotchY - 12) parts.push(...briefs(bf));
-  return { parts };
+
+  // ---- decorations ----
+  const front = Math.round(N / 4); // direction +z
+  const surfaceAt = (y: number, j: number): { x: number; z: number; r: number } => {
+    for (let i = 1; i < rings.length; i++) {
+      if (y >= rings[i].y) {
+        const t = (y - rings[i].y) / Math.max(1e-6, rings[i - 1].y - rings[i].y);
+        const a = rings[i], b = rings[i - 1];
+        const r = lerp(a.radii![j], b.radii![j], t);
+        const th = (j / N) * Math.PI * 2;
+        return { x: lerp(a.cx, b.cx, t) + r * Math.cos(th), z: lerp(a.cz, b.cz, t) + r * Math.sin(th), r };
+      }
+    }
+    const a = rings[rings.length - 1];
+    const th = (j / N) * Math.PI * 2;
+    return { x: a.cx + a.radii![j] * Math.cos(th), z: a.cz + a.radii![j] * Math.sin(th), r: a.radii![j] };
+  };
+  const deco: Decorations = { buttons: [], pockets: [] };
+  const lowest = edgeY(front) - 2.2;
+  if (g.detail.buttons === 'full') {
+    for (let y = lowest; y > hemY + 5; y -= 8) {
+      const p = surfaceAt(y, front);
+      deco.buttons.push([p.x, y, p.z + 0.25]);
+    }
+  } else if (g.detail.buttons === 'placket') {
+    for (let k = 0; k < 3; k++) {
+      const y = lowest - k * 3.4;
+      const p = surfaceAt(y, front);
+      deco.buttons.push([p.x, y, p.z + 0.25]);
+    }
+  }
+  if (g.detail.pocket) {
+    // The wearer's left chest: +x as seen from the front.
+    const y = m.chestY - 3;
+    let jBest = front, bestDx = Infinity;
+    for (let j = 0; j < N / 2; j++) {
+      const p = surfaceAt(y, j);
+      const dx = Math.abs(p.x - (shoulderHalf * 0.38 + torsoHalf * 0.25));
+      if (dx < bestDx) { bestDx = dx; jBest = j; }
+    }
+    const p = surfaceAt(y, jBest);
+    const th = (jBest / N) * Math.PI * 2;
+    deco.pockets.push({ pos: [p.x, y, p.z + 0.12 * Math.sin(th)], nx: Math.cos(th), nz: Math.sin(th), w: 9, h: 10 });
+  }
+  return { parts, decorations: deco };
 }
 
 /** Plain briefs so the figure is not bare under short tops. */
@@ -263,5 +356,13 @@ function armSleeve(fit: FitResult, bf: BodyFit, side: 1 | -1): Part | null {
     rings.push({ y: -d, cx: cx - sx, cz, a: max, b: max, radii: r, tint: chestEase < 0 ? 1 : 0 });
   }
   if (rings.length < 2) return null;
-  return { name: side === 1 ? 'sleeve-r' : 'sleeve-l', kind: 'garment', rings: smoothRings(rings, 2), origin: { x: sx, y: sy }, rotZ: side * theta };
+  // Sleeve hem band, and a darker cuff band on sleeves that have one (applied after smoothing).
+  const cuffed = fit.garment.detail.cuffs && fit.garment.sleeveStyle !== 'short';
+  const smooth = smoothRings(rings, 2);
+  for (const r of smooth) {
+    const fromEnd = end + r.y; // ring y is minus the distance along the arm
+    const hem = fromEnd < (cuffed ? 4 : 1.2);
+    r.trim = r.radii!.map(() => (hem ? (cuffed ? 1 : 0.7) : 0));
+  }
+  return { name: side === 1 ? 'sleeve-r' : 'sleeve-l', kind: 'garment', rings: smooth, origin: { x: sx, y: sy }, rotZ: side * theta };
 }

@@ -25,6 +25,7 @@ import {
   STYLE_EASE_CM,
 } from './fit-config';
 import { findRow } from './sizes';
+import { DEFAULT_DETAIL } from './detail';
 
 type BodyInput = Omit<BodyProfile, 'shoulderCm' | 'inseamCm' | 'weightKg'> &
   Partial<Pick<BodyProfile, 'weightKg'>> &
@@ -115,6 +116,7 @@ export function garmentDims(row: SizeRow, chart: SizeChart, garment: Garment, bo
     convention: chart.convention,
     styleEase,
     sleeveStyle,
+    detail: garment.detail ?? DEFAULT_DETAIL,
     chestCm,
     waistCm,
     shoulderCm,

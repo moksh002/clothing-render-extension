@@ -11,6 +11,10 @@ export interface Ring {
   b: number;
   /** Polar radii around (cx, cz), evenly spaced in angle. When present they replace the ellipse (a, b). */
   radii?: number[];
+  /** Per-vertex height overrides (a neckline cut lowers the edge at some angles). */
+  ys?: number[];
+  /** 0..1 per vertex: how much of the trim colour (rib band, cuff, hem) this vertex takes. */
+  trim?: number[];
   /** 0..1, how red the garment is at this ring (tight). */
   tint: number;
 }
