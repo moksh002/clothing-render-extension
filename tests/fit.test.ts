@@ -200,3 +200,43 @@ describe('fit keywords (FR-25)', () => {
     expect(sleeveStyleFromText(['Mystery top'])).toBeUndefined();
   });
 });
+
+describe('garment length and sleeves follow the size, not the wearer', () => {
+  const body = (chart: SizeChart) => ({ title: 't', chart, styleEase: 'regular' as const });
+  const chart: SizeChart = {
+    convention: 'body',
+    rows: [{ label: 'XS', chestCm: 89 }, { label: 'M', chestCm: 99 }, { label: 'XL', chestCm: 111 }],
+  };
+  const tall: BodyProfile = { ...man, heightCm: 195 };
+  const short: BodyProfile = { ...man, heightCm: 160 };
+  const woman: BodyProfile = { ...man, gender: 'women', heightCm: 168, chestCm: 92, waistCm: 74, hipsCm: 99, shoulderCm: 39 };
+
+  it('is the same length on a tall and a short person', () => {
+    const a = computeFit(tall, body(chart), 'M')!;
+    const b = computeFit(short, body(chart), 'M')!;
+    expect(a.garment.lengthCm).toBeCloseTo(b.garment.lengthCm, 5);
+    expect(a.garment.sleeveCm).toBeCloseTo(b.garment.sleeveCm, 5);
+  });
+
+  it('gets longer with the size, and oversized sits longer than regular', () => {
+    const len = (size: string, style: 'regular' | 'oversized') => computeFit(man, { ...body(chart), styleEase: style }, size)!.garment.lengthCm;
+    expect(len('XS', 'regular')).toBeLessThan(len('M', 'regular'));
+    expect(len('M', 'regular')).toBeLessThan(len('XL', 'regular'));
+    expect(len('M', 'oversized')).toBeGreaterThan(len('M', 'regular'));
+    // a sensible tee: about 66 to 74 cm across the range
+    expect(len('XS', 'regular')).toBeGreaterThan(64);
+    expect(len('XL', 'regular')).toBeLessThan(76);
+  });
+
+  it('a short person gets a longer-looking hem than a tall one (same garment, shorter torso)', () => {
+    const a = computeFit(tall, body(chart), 'M')!;
+    const b = computeFit(short, body(chart), 'M')!;
+    expect(b.garment.lengthCm / b.body.torsoLengthCm).toBeGreaterThan(a.garment.lengthCm / a.body.torsoLengthCm);
+  });
+
+  it('uses the product gender for proportions, not the wearer', () => {
+    const asMen = computeFit(woman, { ...body(chart), gender: 'men' }, 'M')!;
+    const asWomen = computeFit(woman, { ...body(chart), gender: 'women' }, 'M')!;
+    expect(asMen.garment.shoulderCm).toBeGreaterThan(asWomen.garment.shoulderCm);
+  });
+});

@@ -13,7 +13,7 @@ import {
   saveSize,
   type ManualChart,
 } from '../profile/storage';
-import type { BodyProfile, ChartSource, FitResult, Garment } from '../types';
+import type { BodyProfile, ChartSource, FitResult, Garment, Gender } from '../types';
 import { FitFigure } from './FitFigure';
 import { PasteChart } from './PasteChart';
 import { usePageState } from './usePageState';
@@ -70,9 +70,18 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
   const [pasting, setPasting] = useState(false);
   const [usePhoto, setUsePhoto] = useState(true);
   const [pose, setPoseState] = useState('a-pose');
+  // Preview on a male or female body with the same measurements (null = the profile's own type).
+  const [modelGender, setModelGenderState] = useState<Gender | null>(null);
   useEffect(() => {
-    chrome.storage.local.get('pose').then((r) => typeof r.pose === 'string' && setPoseState(r.pose));
+    chrome.storage.local.get(['pose', 'modelGender']).then((r) => {
+      if (typeof r.pose === 'string') setPoseState(r.pose);
+      if (r.modelGender === 'men' || r.modelGender === 'women') setModelGenderState(r.modelGender);
+    });
   }, []);
+  const setModelGender = (g: Gender) => {
+    setModelGenderState(g);
+    chrome.storage.local.set({ modelGender: g });
+  };
   const setPose = (id: string) => {
     setPoseState(id);
     chrome.storage.local.set({ pose: id });
@@ -135,8 +144,8 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
   const look = useMemo(() => (usePhoto && photoLook ? photoLook : undefined), [usePhoto, photoLook]);
 
   const fit = useMemo(
-    () => (profile && garment && size ? computeFit(profile, garment, size) : null),
-    [profile, garment, size],
+    () => (profile && garment && size ? computeFit({ ...profile, gender: modelGender ?? profile.gender }, garment, size) : null),
+    [profile, garment, size, modelGender],
   );
 
   const submitLink = () => {
@@ -256,6 +265,19 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
 
       {fit && (
         <>
+          <div className="model-gender" role="group" aria-label="Model body type">
+            <span className="muted small">Model</span>
+            <div className="segmented">
+              {(['women', 'men'] as Gender[]).map((g) => (
+                <button type="button" key={g} aria-pressed={(modelGender ?? profile?.gender) === g} onClick={() => setModelGender(g)}>
+                  {g === 'women' ? 'Women' : 'Men'}
+                </button>
+              ))}
+            </div>
+            {profile && modelGender && modelGender !== profile.gender && (
+              <span className="muted small">Your measurements on a {modelGender === 'men' ? 'male' : 'female'} body</span>
+            )}
+          </div>
           <FitFigure fit={fit} look={look} pose={pose} onPose={setPose} />
           {lookBusy && <p className="muted small">Reading the product photos…</p>}
           {photoLook && (

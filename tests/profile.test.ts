@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIELDS, TEST_PROFILE, fromDisplay, parseField, toDisplay, validateProfile } from '../src/profile/profile';
+import { FIELDS, TEST_PROFILE, TEST_PROFILES, fromDisplay, parseField, toDisplay, validateProfile } from '../src/profile/profile';
 
 const height = FIELDS.find((f) => f.key === 'heightCm')!;
 const weight = FIELDS.find((f) => f.key === 'weightKg')!;
@@ -31,6 +31,16 @@ describe('profile validation', () => {
 });
 
 describe('test profile', () => {
+  it('has a valid made-up profile for both genders', () => {
+    for (const g of ['men', 'women'] as const) {
+      const p = TEST_PROFILES[g];
+      expect(p.gender).toBe(g);
+      expect(p.heightCm).toBe(170);
+      const texts = Object.fromEntries(FIELDS.map((f) => [f.key, String(p[f.key])])) as never;
+      expect('profile' in validateProfile(texts, 'cm')).toBe(true);
+    }
+  });
+
   it('passes validation in both units', () => {
     for (const unit of ['cm', 'in'] as const) {
       const texts = Object.fromEntries(FIELDS.map((f) => [f.key, String(toDisplay(f, TEST_PROFILE[f.key], unit))])) as never;

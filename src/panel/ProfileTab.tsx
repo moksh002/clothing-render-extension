@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { BodyProfile, Gender } from '../types';
 import {
   FIELDS,
-  TEST_PROFILE,
+  TEST_PROFILES,
   toDisplay,
   unitLabel,
   validateProfile,
@@ -70,10 +70,10 @@ export function ProfileTab() {
   };
 
   const onFillTest = () => {
-    setGender(TEST_PROFILE.gender);
-    setTexts(profileToTexts(TEST_PROFILE, unit));
+    // Fill in the made-up profile for whichever body type is selected.
+    setTexts(profileToTexts(TEST_PROFILES[gender], unit));
     setErrors({});
-    setStatus('Test profile filled in. Press Save to keep it.');
+    setStatus(`Test profile (${gender === 'men' ? 'men' : 'women'}) filled in. Press Save to keep it.`);
   };
 
   const onReset = async () => {
@@ -150,7 +150,7 @@ export function ProfileTab() {
         <button type="button" onClick={onReset}>
           Reset
         </button>
-        <button type="button" onClick={onFillTest} title="170 cm, average build, slightly bigger belly">
+        <button type="button" onClick={onFillTest} title="170 cm, average build, slightly bigger belly, for the selected Men/Women type">
           Test profile
         </button>
         <span className="status" role="status">

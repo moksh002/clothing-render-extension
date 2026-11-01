@@ -29,15 +29,17 @@ export const SHOULDER_EASE_CM: Record<StyleEase, number> = {
   oversized: 9,
 };
 
-/** Garment length as a fraction of height, used when the chart has no length. */
-export const DEFAULT_LENGTH_RATIO: Record<StyleEase, number> = {
-  slim: 0.38,
-  regular: 0.4,
-  relaxed: 0.42,
-  oversized: 0.44,
-};
+/**
+ * Garment length (high point of shoulder to hem) when the chart does not give one. It depends on the garment's
+ * size, not on who wears it: a top for a 89 cm chest is this long, and each extra cm of chest adds a little.
+ */
+export const LENGTH_AT_SIZE = { refChestCm: 89, cm: 66, perChestCm: 0.36 };
+/** Extra length by cut: relaxed and oversized tops are boxier and sit longer. */
+export const LENGTH_STYLE_CM: Record<StyleEase, number> = { slim: -1, regular: 0, relaxed: 1.5, oversized: 2.5 };
+/** Shoulder-to-wrist arm length of the person a size is cut for, by the body chest of that size. */
+export const SLEEVE_ARM_AT_SIZE = { refChestCm: 94, cm: 58, perChestCm: 0.35 };
 
-/** Sleeve length as a fraction of arm length, by sleeve style. */
+/** Sleeve length as a fraction of the arm length it is cut for, by sleeve style. */
 export const SLEEVE_RATIO: Record<SleeveStyle, number> = {
   sleeveless: 0,
   short: 0.4,

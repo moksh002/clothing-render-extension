@@ -11,9 +11,11 @@ import type {
   SizeRow,
 } from '../types';
 import {
-  DEFAULT_LENGTH_RATIO,
   DEFAULT_SLEEVE_STYLE,
   DEFAULT_STYLE_EASE,
+  LENGTH_AT_SIZE,
+  LENGTH_STYLE_CM,
+  SLEEVE_ARM_AT_SIZE,
   EASE_THRESHOLDS,
   FLAT_CHEST_MAX_CM,
   GARMENT_WAIST_PER_CHEST,
@@ -78,6 +80,10 @@ export function garmentDims(row: SizeRow, chart: SizeChart, garment: Garment, bo
 
   // Chest: required on every chart.
   const chestCm = (row.chestCm ?? NaN) * flat + ease;
+  // The body chest this size is cut for; garment length and sleeves follow the size, not the wearer.
+  const refChest = (row.chestCm ?? NaN) * flat - (isBody ? 0 : STYLE_EASE_CM[styleEase]);
+  // Garment proportions come from the garment's own gender (the product), not from whoever wears it.
+  const cut = garment.gender ?? body.gender;
 
   const estimated = { waist: false, shoulder: false, length: false, sleeve: false };
 
@@ -93,21 +99,21 @@ export function garmentDims(row: SizeRow, chart: SizeChart, garment: Garment, bo
   else {
     // Estimate from the chart's own chest (body or garment) so it scales with size.
     const baseChest = (row.chestCm ?? NaN) * flat;
-    shoulderCm = baseChest * PROPORTIONS.shoulderPerChest[body.gender] + (isBody ? SHOULDER_EASE_CM[styleEase] : 0);
+    shoulderCm = baseChest * PROPORTIONS.shoulderPerChest[cut] + (isBody ? SHOULDER_EASE_CM[styleEase] : 0);
     estimated.shoulder = true;
   }
 
   let lengthCm: number;
   if (row.lengthCm != null) lengthCm = row.lengthCm;
   else {
-    lengthCm = body.heightCm * DEFAULT_LENGTH_RATIO[styleEase];
+    lengthCm = LENGTH_AT_SIZE.cm + LENGTH_AT_SIZE.perChestCm * (refChest - LENGTH_AT_SIZE.refChestCm) + LENGTH_STYLE_CM[styleEase];
     estimated.length = true;
   }
 
   let sleeveCm: number;
   if (row.sleeveCm != null) sleeveCm = row.sleeveCm;
   else {
-    sleeveCm = body.armLengthCm * SLEEVE_RATIO[sleeveStyle];
+    sleeveCm = (SLEEVE_ARM_AT_SIZE.cm + SLEEVE_ARM_AT_SIZE.perChestCm * (refChest - SLEEVE_ARM_AT_SIZE.refChestCm)) * SLEEVE_RATIO[sleeveStyle];
     estimated.sleeve = true;
   }
 
