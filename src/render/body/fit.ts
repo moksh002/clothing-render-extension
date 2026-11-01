@@ -31,9 +31,10 @@ export interface BodyFit {
 const TRUNK_HALF_WIDTH_CM = 30;
 
 /** Scale to cm, put the feet on y = 0 and the body centre line on x = 0. */
-function toCm(pos: Float32Array, unitCm: number, targetHeightCm: number | null): Float32Array {
+function toCm(pos: Float32Array, unitCm: number, targetHeightCm: number | null, bodyCount: number): Float32Array {
   let minY = Infinity, maxY = -Infinity;
-  for (let i = 1; i < pos.length; i += 3) {
+  // Height comes from the body only; the eye and joint helper vertices after it can stick out.
+  for (let i = 1; i < bodyCount * 3; i += 3) {
     minY = Math.min(minY, pos[i]);
     maxY = Math.max(maxY, pos[i]);
   }
@@ -48,9 +49,9 @@ function toCm(pos: Float32Array, unitCm: number, targetHeightCm: number | null):
   return out;
 }
 
-export function measureBody(pos: Float32Array, srcTris: Uint32Array): BodyMeasures {
+export function measureBody(pos: Float32Array, srcTris: Uint32Array, bodyCount = pos.length / 3): BodyMeasures {
   let maxY = -Infinity;
-  for (let i = 1; i < pos.length; i += 3) maxY = Math.max(maxY, pos[i]);
+  for (let i = 1; i < bodyCount * 3; i += 3) maxY = Math.max(maxY, pos[i]);
   const H = maxY;
   const trunk = (y: number) => trunkLoop(sliceLoops(pos, srcTris, y), TRUNK_HALF_WIDTH_CM);
 
@@ -103,14 +104,14 @@ const FIT: { key: keyof BodyMeasures; modifiers: Measure[]; target: (p: BodyProf
 export function fitBody(assets: BodyAssets, profile: BodyProfile, iterations = 4): BodyFit {
   const params = defaultParams(profile.gender);
   params.weight = weightSlider(profile.weightKg, profile.heightCm);
-  const build = (p: BodyParams) => toCm(morphPositions(assets, p), assets.unitCm, profile.heightCm);
+  const build = (p: BodyParams) => toCm(morphPositions(assets, p), assets.unitCm, profile.heightCm, assets.bodyCount);
 
   // Slope of each measurement per unit of its modifier, measured on the starting body.
   const slope = new Map<Measure, number>();
   const probe = (modifiers: Measure[], key: keyof BodyMeasures, v: number) => {
     const q: BodyParams = { ...params, measures: {} };
     for (const m of modifiers) q.measures[m] = v;
-    return measureBody(build(q), assets.srcTris)[key] as number;
+    return measureBody(build(q), assets.srcTris, assets.bodyCount)[key] as number;
   };
   for (const f of FIT) {
     const s = (probe(f.modifiers, f.key, 1) - probe(f.modifiers, f.key, -1)) / 2;
@@ -118,7 +119,7 @@ export function fitBody(assets: BodyAssets, profile: BodyProfile, iterations = 4
   }
 
   let pos = build(params);
-  let measured = measureBody(pos, assets.srcTris);
+  let measured = measureBody(pos, assets.srcTris, assets.bodyCount);
   for (let it = 0; it < iterations; it++) {
     for (const f of FIT) {
       const err = f.target(profile) - (measured[f.key] as number);
@@ -129,7 +130,7 @@ export function fitBody(assets: BodyAssets, profile: BodyProfile, iterations = 4
       }
     }
     pos = build(params);
-    measured = measureBody(pos, assets.srcTris);
+    measured = measureBody(pos, assets.srcTris, assets.bodyCount);
   }
   return { params, assets, srcTris: assets.srcTris, positionsCm: pos, measured };
 }

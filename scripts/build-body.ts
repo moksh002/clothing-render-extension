@@ -36,7 +36,13 @@ const bodyCount = Math.max(...faces.flat().map((p) => p[0])) + 1;
 // Eyeball helper meshes ride along after the body vertices: new index = bodyCount + k.
 const extraMap = new Map<number, number>();
 for (const fs of Object.values(eyeFaces)) for (const f of fs) for (const i of f) if (!extraMap.has(i)) extraMap.set(i, bodyCount + extraMap.size);
+// The skeleton: bones, joint positions (means of helper vertices) and skin weights.
+interface RigBone { head: string; tail: string; parent: string | null }
+const rig = JSON.parse(readFileSync(join(src, 'rigs/default.mhskel'), 'utf8')) as { bones: Record<string, RigBone>; joints: Record<string, number[]> };
+const rigWeights = JSON.parse(readFileSync(join(src, 'rigs/default_weights.mhw'), 'utf8')) as { weights: Record<string, [number, number][]> };
+for (const ids of Object.values(rig.joints)) for (const i of ids) if (i >= bodyCount && !extraMap.has(i)) extraMap.set(i, bodyCount + extraMap.size);
 const srcCount = bodyCount + extraMap.size;
+const remap = (i: number) => (i < bodyCount ? i : extraMap.get(i)!);
 const eyes = Object.fromEntries(
   Object.entries(eyeFaces).map(([k, fs]) => {
     const tri: number[] = [];
@@ -106,8 +112,42 @@ for (const dir of ['macrodetails', 'measure']) {
 }
 writeFileSync(join(out, 'targets.bin'), Buffer.concat(chunks));
 
+// ---- skeleton and skin weights ----
+const boneNames: string[] = [];
+const addBone = (n: string) => {
+  if (boneNames.includes(n)) return;
+  const p = rig.bones[n].parent;
+  if (p) addBone(p);
+  boneNames.push(n);
+};
+Object.keys(rig.bones).sort().forEach(addBone);
+const bones = boneNames.map((n) => ({
+  name: n,
+  parent: rig.bones[n].parent ? boneNames.indexOf(rig.bones[n].parent!) : -1,
+  head: rig.joints[rig.bones[n].head].map(remap),
+  tail: rig.joints[rig.bones[n].tail].map(remap),
+}));
+// Top four influences per body vertex, normalised, as bytes.
+const infl: [number, number][][] = Array.from({ length: bodyCount }, () => []);
+for (const [name, list] of Object.entries(rigWeights.weights)) {
+  const bi = boneNames.indexOf(name);
+  if (bi < 0) continue;
+  for (const [vi, w] of list) if (vi < bodyCount && w > 0) infl[vi].push([bi, w]);
+}
+const skinIdx = new Uint8Array(bodyCount * 4);
+const skinW = new Uint8Array(bodyCount * 4);
+infl.forEach((list, vi) => {
+  list.sort((a, b) => b[1] - a[1]);
+  const top = list.slice(0, 4);
+  const total = top.reduce((t, x) => t + x[1], 0) || 1;
+  top.forEach(([bi, w], k) => {
+    skinIdx[vi * 4 + k] = bi;
+    skinW[vi * 4 + k] = Math.round((w / total) * 255);
+  });
+});
+
 // ---- base buffer ----------------------------------------------------------------------------------
-const parts = [positions, rvSrcA, rvUvA, trisA];
+const parts = [positions, rvSrcA, rvUvA, trisA, skinIdx, skinW];
 const sizes = parts.map((a) => a.byteLength + pad4(a.byteLength));
 const baseOffsets = sizes.map((_, i) => sizes.slice(0, i).reduce((s, x) => s + x, 0));
 const base = Buffer.alloc(sizes.reduce((s, x) => s + x, 0));
@@ -130,7 +170,10 @@ writeFileSync(
       rvSrc: { offset: baseOffsets[1], length: rvSrcA.length },
       rvUv: { offset: baseOffsets[2], length: rvUvA.length },
       tris: { offset: baseOffsets[3], length: trisA.length },
+      skinIdx: { offset: baseOffsets[4], length: skinIdx.length },
+      skinW: { offset: baseOffsets[5], length: skinW.length },
     },
+    bones,
     targets: entries,
   }),
 );

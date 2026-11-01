@@ -226,7 +226,7 @@ export function buildBodyGarment(fit: FitResult, bf: BodyFit): BodyGarment {
     }
   }
   // Briefs only matter where the top leaves the hips bare; under a long top they would just z-fight with it.
-  if (hemY > m.crotchY - 12) parts.push(...briefs(bf));
+  if (hemY > m.crotchY + 2) parts.push(...briefs(bf));
 
   // ---- decorations ----
   const front = Math.round(N / 4); // direction +z

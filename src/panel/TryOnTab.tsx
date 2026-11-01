@@ -69,6 +69,14 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
   const [manual, setManual] = useState<ManualChart | null>(null);
   const [pasting, setPasting] = useState(false);
   const [usePhoto, setUsePhoto] = useState(true);
+  const [pose, setPoseState] = useState('a-pose');
+  useEffect(() => {
+    chrome.storage.local.get('pose').then((r) => typeof r.pose === 'string' && setPoseState(r.pose));
+  }, []);
+  const setPose = (id: string) => {
+    setPoseState(id);
+    chrome.storage.local.set({ pose: id });
+  };
 
   useEffect(() => {
     loadProfile().then(setProfile);
@@ -248,7 +256,7 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
 
       {fit && (
         <>
-          <FitFigure fit={fit} look={look} />
+          <FitFigure fit={fit} look={look} pose={pose} onPose={setPose} />
           {lookBusy && <p className="muted small">Reading the product photos…</p>}
           {photoLook && (
             <label className="photo-look">

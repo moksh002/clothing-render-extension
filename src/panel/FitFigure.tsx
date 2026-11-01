@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FitResult } from '../types';
 import { SvgRenderer } from '../render/svg-renderer';
+import { POSES } from '../render/body/poses';
 import { ThreeRenderer, type GarmentLook, type View } from '../render/three/scene';
 
 const svg = new SvgRenderer();
@@ -14,10 +15,12 @@ const VIEWS: { id: View; label: string }[] = [
 interface Props {
   fit: FitResult;
   look?: GarmentLook;
+  pose: string;
+  onPose: (id: string) => void;
 }
 
 /** 3D figure you can drag to rotate; falls back to the flat 2D drawing if WebGL is unavailable. */
-export function FitFigure({ fit, look }: Props) {
+export function FitFigure({ fit, look, pose, onPose }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const three = useRef<ThreeRenderer | null>(null);
@@ -41,9 +44,9 @@ export function FitFigure({ fit, look }: Props) {
   }, [mode]);
 
   useEffect(() => {
-    if (mode === '3d') three.current?.update(fit, look);
+    if (mode === '3d') three.current?.update(fit, look, pose);
     else if (svgRef.current) svg.render(fit, svgRef.current);
-  }, [fit, look, mode]);
+  }, [fit, look, mode, pose]);
 
   return (
     <div className="figure-wrap">
@@ -65,6 +68,15 @@ export function FitFigure({ fit, look }: Props) {
         )}
         {mode === '3d' && <span className="muted small">Drag to rotate</span>}
       </div>
+      {mode === '3d' && (
+        <div className="poses" role="group" aria-label="Pose">
+          {POSES.map((p) => (
+            <button type="button" key={p.id} className="chip-btn" aria-pressed={pose === p.id} onClick={() => onPose(p.id)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
