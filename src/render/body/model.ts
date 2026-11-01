@@ -1,6 +1,7 @@
 import type { BodyDims } from '../../types';
 import { loadBodyAssets, type BodyAssets } from './assets';
 import { fitBody, type BodyFit } from './fit';
+import { NearestVertex, boneMatrices, transformNormal, transformPoint, vertexMatrices } from './skeleton';
 
 export interface BodyMeshData {
   positions: Float32Array;
@@ -9,8 +10,73 @@ export interface BodyMeshData {
   index: Uint32Array;
 }
 
+/** Everything needed to move rest-pose geometry into a pose. */
+export interface PoseSkin {
+  /** One 3x4 matrix per body vertex. */
+  vm: Float32Array;
+  /** One 3x4 matrix per bone. */
+  bones: Float32Array;
+  nearest: NearestVertex;
+  /** Nearest-vertex lookups restricted to each arm, for sleeves (side +1 is the +x arm). */
+  arms: { plus: NearestVertex; minus: NearestVertex };
+  /** Lift or lower the whole figure so the lowest point of the body rests on the floor. */
+  groundShift: number;
+  headMatrix: number[];
+}
+
+const nearestCache = new WeakMap<BodyFit, { all: NearestVertex; plus: NearestVertex; minus: NearestVertex }>();
+const ARM_BONE = /^(upperarm|lowerarm|wrist|finger|metacarpal)/;
+
+/** Skinning data for a pose (null for the rest pose). */
+export function poseSkin(bf: BodyFit, poseId: string): PoseSkin | null {
+  if (poseId === 'a-pose') return null;
+  const { assets } = bf;
+  const bones = boneMatrices(assets, bf.positionsCm, poseId);
+  const vm = vertexMatrices(assets, bones);
+  let lookups = nearestCache.get(bf);
+  if (!lookups) {
+    const p0 = bf.positionsCm;
+    const isArm = (v: number) => ARM_BONE.test(assets.bones[assets.skinIdx[v * 4]].name);
+    lookups = {
+      all: new NearestVertex(p0, assets.bodyCount),
+      plus: new NearestVertex(p0, assets.bodyCount, (v) => isArm(v) && p0[v * 3] > 0),
+      minus: new NearestVertex(p0, assets.bodyCount, (v) => isArm(v) && p0[v * 3] < 0),
+    };
+    nearestCache.set(bf, lookups);
+  }
+  const nearest = lookups.all;
+  const p = bf.positionsCm;
+  const tmp = [0, 0, 0];
+  let minY = Infinity;
+  for (let v = 0; v < assets.bodyCount; v++) {
+    transformPoint(vm, v * 12, p[v * 3], p[v * 3 + 1], p[v * 3 + 2], tmp, 0);
+    if (tmp[1] < minY) minY = tmp[1];
+  }
+  const head = assets.bones.findIndex((b) => b.name === 'head');
+  return { vm, bones, nearest, arms: { plus: lookups.plus, minus: lookups.minus }, groundShift: -minY, headMatrix: Array.from(bones.subarray(head * 12, head * 12 + 12)) };
+}
+
+/**
+ * Move a rest-pose point and its normal into the pose. The skin matrix is blended from the nearest body
+ * vertices (only the given arm's for a sleeve), so cloth bends smoothly instead of tearing at seams.
+ */
+export function skinVertex(skin: PoseSkin, pos: Float32Array | number[], nrm: Float32Array | number[] | null, i: number, arm: 0 | 1 | -1 = 0): void {
+  const lookup = arm === 1 ? skin.arms.plus : arm === -1 ? skin.arms.minus : skin.nearest;
+  const near = lookup.findK(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], 6);
+  const M = new Array<number>(12).fill(0);
+  for (const { v, w } of near) for (let m = 0; m < 12; m++) M[m] += w * skin.vm[v * 12 + m];
+  const mm = Float32Array.from(M);
+  const a = [0, 0, 0];
+  transformPoint(mm, 0, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], a, 0);
+  pos[i * 3] = a[0]; pos[i * 3 + 1] = a[1]; pos[i * 3 + 2] = a[2];
+  if (nrm) {
+    transformNormal(mm, 0, nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2], a, 0);
+    nrm[i * 3] = a[0]; nrm[i * 3 + 1] = a[1]; nrm[i * 3 + 2] = a[2];
+  }
+}
+
 /** Area-weighted vertex normals over the source mesh, copied to the render vertices (so UV seams stay smooth). */
-export function bodyMeshData(bf: BodyFit): BodyMeshData {
+export function bodyMeshData(bf: BodyFit, skin: PoseSkin | null = null): BodyMeshData {
   const { assets } = bf;
   const pos = bf.positionsCm;
   const nSrc = pos.length / 3;
@@ -36,6 +102,12 @@ export function bodyMeshData(bf: BodyFit): BodyMeshData {
     const s = assets.rvSrc[i] * 3;
     positions.set([pos[s], pos[s + 1], pos[s + 2]], i * 3);
     normals.set([nrm[s], nrm[s + 1], nrm[s + 2]], i * 3);
+    if (skin) {
+      // Body vertices use their own skin weights directly.
+      const m = assets.rvSrc[i] * 12;
+      transformPoint(skin.vm, m, pos[s], pos[s + 1], pos[s + 2], positions, i * 3);
+      transformNormal(skin.vm, m, nrm[s], nrm[s + 1], nrm[s + 2], normals, i * 3);
+    }
   }
   return { positions, normals, uvs: assets.rvUv, index: assets.tris };
 }

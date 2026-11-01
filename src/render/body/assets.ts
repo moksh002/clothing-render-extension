@@ -21,12 +21,21 @@ export interface BodyAssets {
   unitCm: number;
   /** Eyeball helper meshes: triangle indices over the source vertices. */
   eyes: { left: Uint32Array; right: Uint32Array };
+  /** Number of true body vertices (the rest are eye and joint helpers). */
+  bodyCount: number;
+  /** Skeleton, parents before children. head/tail are helper-vertex ids whose mean is the joint position. */
+  bones: { name: string; parent: number; head: number[]; tail: number[] }[];
+  /** Four bone influences per body vertex. */
+  skinIdx: Uint8Array;
+  skinW: Uint8Array;
 }
 
 interface Meta {
   unitCm: number;
+  bodyCount: number;
   eyes: { left: number[]; right: number[] };
-  layout: Record<'positions' | 'rvSrc' | 'rvUv' | 'tris', { offset: number; length: number }>;
+  bones: BodyAssets['bones'];
+  layout: Record<'positions' | 'rvSrc' | 'rvUv' | 'tris' | 'skinIdx' | 'skinW', { offset: number; length: number }>;
   targets: { name: string; offset: number; count: number; scale: number }[];
 }
 
@@ -52,6 +61,10 @@ export function parseBodyAssets(meta: Meta, body: ArrayBuffer, targets: ArrayBuf
   return {
     positions, rvSrc, rvUv, tris, srcTris, targets: map, unitCm: meta.unitCm,
     eyes: { left: new Uint32Array(meta.eyes.left), right: new Uint32Array(meta.eyes.right) },
+    bodyCount: meta.bodyCount,
+    bones: meta.bones,
+    skinIdx: new Uint8Array(body, l.skinIdx.offset, l.skinIdx.length),
+    skinW: new Uint8Array(body, l.skinW.offset, l.skinW.length),
   };
 }
 
