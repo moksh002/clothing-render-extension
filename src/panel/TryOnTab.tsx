@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeFit } from '../fit/engine';
 import { findRow } from '../fit/sizes';
+import { compareWithModel, recommendSize, smallerFirst } from '../fit/recommend';
 import { parseCsvChart } from '../fit/csv';
 import { LABEL_WORDS, summarise } from '../fit/summary';
 import { buildGarment } from '../adapters/garment';
@@ -148,6 +149,14 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
     [profile, garment, size, modelGender],
   );
 
+  // Best size across the whole chart for the same body the figure shows, and how you compare with the model.
+  const effective = useMemo(() => (profile ? { ...profile, gender: modelGender ?? profile.gender } : null), [profile, modelGender]);
+  const advice = useMemo(() => (effective && garment ? recommendSize(effective, garment, labels) : null), [effective, garment, labels]);
+  const vsModel = useMemo(
+    () => (effective && garment ? compareWithModel(effective, garment, product?.facts.modelSize) : null),
+    [effective, garment, product],
+  );
+
   const submitLink = () => {
     const r = parseProductLink(linkText);
     if (!r.ok) {
@@ -286,6 +295,38 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
               <span className="swatch" style={{ background: photoLook.colour }} aria-hidden="true" />
               Use {photoLook.textureDataUrl ? 'colour and print' : 'colour'} from the product photo
             </label>
+          )}
+          {advice && (
+            <div className="advice" role="status">
+              <p>
+                <strong>
+                  {advice.alsoConsider
+                    ? `Between ${smallerFirst(advice.best, advice.alsoConsider).join(' and ')}`
+                    : `Best size for you: ${advice.best}`}
+                </strong>
+                {size === advice.best ? ' · you are looking at it' : ''}
+              </p>
+              {size !== advice.best && (
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    setSize(advice.best);
+                    saveSize(page.url, advice.best);
+                  }}
+                >
+                  Show {advice.best}
+                </button>
+              )}
+              {vsModel && (
+                <p className="muted small">
+                  The model wears {page.facts.modelSize} (a {Math.round(vsModel.chestCm)} cm chest).{' '}
+                  {Math.abs(vsModel.youMinusModelCm) < 1.5
+                    ? 'Your chest is about the same.'
+                    : `Your chest is ${Math.round(Math.abs(vsModel.youMinusModelCm))} cm ${vsModel.youMinusModelCm < 0 ? 'smaller' : 'bigger'}, so expect it to look ${vsModel.youMinusModelCm < 0 ? 'looser' : 'snugger'} than in the photos.`}
+                </p>
+              )}
+            </div>
           )}
           <ul className="summary">
             {summarise(fit).map((l) => (

@@ -75,3 +75,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .chip-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .model-gender { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .model-gender .segmented button { padding: 4px 12px; font-size: 12px; }
+
+.advice { padding: 8px 10px; background: #eef3ff; border-radius: 8px; display: grid; gap: 2px; }
+.advice p { margin: 0; }
+.advice .link { justify-self: start; }
