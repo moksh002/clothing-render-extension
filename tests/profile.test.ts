@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIELDS, fromDisplay, parseField, toDisplay, validateProfile } from '../src/profile/profile';
+import { FIELDS, TEST_PROFILE, fromDisplay, parseField, toDisplay, validateProfile } from '../src/profile/profile';
 
 const height = FIELDS.find((f) => f.key === 'heightCm')!;
 const weight = FIELDS.find((f) => f.key === 'weightKg')!;
@@ -27,5 +27,19 @@ describe('profile validation', () => {
     const texts = Object.fromEntries(FIELDS.map((f) => [f.key, '1'])) as never;
     const r = validateProfile(texts, 'cm');
     expect('errors' in r && Object.keys(r.errors).length).toBe(FIELDS.length);
+  });
+});
+
+describe('test profile', () => {
+  it('passes validation in both units', () => {
+    for (const unit of ['cm', 'in'] as const) {
+      const texts = Object.fromEntries(FIELDS.map((f) => [f.key, String(toDisplay(f, TEST_PROFILE[f.key], unit))])) as never;
+      expect('profile' in validateProfile(texts, unit)).toBe(true);
+    }
+  });
+
+  it('is 170 cm with a waist close to the chest (a slightly bigger belly)', () => {
+    expect(TEST_PROFILE.heightCm).toBe(170);
+    expect(TEST_PROFILE.waistCm).toBeGreaterThan(TEST_PROFILE.chestCm - 10);
   });
 });

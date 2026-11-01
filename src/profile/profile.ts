@@ -75,3 +75,15 @@ export function validateProfile(
   }
   return Object.keys(errors).length ? { errors } : { profile };
 }
+
+/** A made-up profile for trying the extension: 170 cm, average build, a slightly bigger belly than usual. */
+export const TEST_PROFILE: BodyProfile = {
+  gender: 'men',
+  heightCm: 170,
+  weightKg: 78,
+  chestCm: 98,
+  waistCm: 92,
+  hipsCm: 99,
+  shoulderCm: 44,
+  inseamCm: 77,
+};
