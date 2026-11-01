@@ -100,8 +100,7 @@ chrome.runtime.onMessage.addListener((msg: PageMessage | LinkMessage, sender) =>
       const url = (await chrome.storage.session.get(k))[k] as string | undefined;
       if (!url) return;
       const st = msg.state;
-      // Wait for the photo look when there is a photo; other states are final.
-      const final = st.kind === 'product' ? !!st.look || !st.imageUrl || !!st.failure : st.kind !== 'loading';
+      const final = st.kind !== 'loading';
       if (final) await finishLink(tabId, url, { status: 'done', state: st });
     });
   }

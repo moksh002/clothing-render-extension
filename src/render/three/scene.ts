@@ -14,6 +14,7 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   PerspectiveCamera,
+  RepeatWrapping,
   Scene,
   SRGBColorSpace,
   SphereGeometry,
@@ -30,8 +31,12 @@ export type View = 'front' | 'side' | 'back';
 /** Appearance of the garment. Defaults to a neutral colour. */
 export interface GarmentLook {
   colour?: string;
-  /** PNG data URL of the garment cut from the photo; shown on the front of the shirt. */
+  /** PNG data URL of the front (and back) garment cut-outs side by side. */
   textureDataUrl?: string;
+  front?: { u0: number; u1: number };
+  back?: { u0: number; u1: number };
+  /** Greyscale fabric weave, used as a bump map. */
+  fabricDataUrl?: string;
 }
 
 const SKIN = new Color('#e3c3a8');
@@ -39,32 +44,38 @@ const NEUTRAL = new Color('#aab8d4');
 const UNDERWEAR = new Color('#262830');
 const TIGHT = new Color('#e5736f');
 const DEFAULT_SEGMENTS = 40;
+/** One tile of the fabric weave covers about this many cm of cloth. */
+const FABRIC_TILE_CM = 6;
 
-/** Loft elliptical rings (top to bottom) into a closed-around, vertex-coloured surface. */
+/** Planar UV for textured garments: the same vertex can map to the front or back photo depending on the face. */
+export type UvOf = (x: number, y: number, z: number, ring: Ring, front: boolean) => [number, number];
+
+/** Loft elliptical or polar rings (top to bottom) into a vertex-coloured surface. */
 export function loftGeometry(
   rings: Ring[],
   base: Color,
   capEnds: boolean,
-  /** Optional planar UV for textured garments: maps a vertex to texture coordinates. */
-  uvOf?: (x: number, y: number, z: number, ring: Ring) => [number, number],
+  uvOf?: UvOf,
+  /** Tile the fabric bump around and along the garment (second UV set). */
+  fabricUv = false,
 ): BufferGeometry {
+  const SEGMENTS = rings[0].radii?.length ?? DEFAULT_SEGMENTS;
   const pos: number[] = [];
-  const uvs: number[] = [];
   const col: number[] = [];
   const idx: number[] = [];
+  const ringOf: number[] = [];
+  const segOf: number[] = [];
   const tint = new Color();
-  const SEGMENTS = rings[0].radii?.length ?? DEFAULT_SEGMENTS;
-  for (const r of rings) {
+  rings.forEach((r, ri) => {
     tint.copy(base).lerp(TIGHT, r.tint);
     for (let j = 0; j < SEGMENTS; j++) {
       const th = (j / SEGMENTS) * Math.PI * 2;
-      const vx = r.cx + (r.radii ? r.radii[j] : r.a) * Math.cos(th);
-      const vz = r.cz + (r.radii ? r.radii[j] : r.b) * Math.sin(th);
-      pos.push(vx, r.y, vz);
+      pos.push(r.cx + (r.radii ? r.radii[j] : r.a) * Math.cos(th), r.y, r.cz + (r.radii ? r.radii[j] : r.b) * Math.sin(th));
       col.push(tint.r, tint.g, tint.b);
-      if (uvOf) uvs.push(...uvOf(vx, r.y, vz, r));
+      ringOf.push(ri);
+      segOf.push(j);
     }
-  }
+  });
   for (let i = 0; i < rings.length - 1; i++) {
     for (let j = 0; j < SEGMENTS; j++) {
       const k = (j + 1) % SEGMENTS;
@@ -82,7 +93,8 @@ export function loftGeometry(
       pos.push(r.cx, r.y, r.cz);
       tint.copy(base).lerp(TIGHT, r.tint);
       col.push(tint.r, tint.g, tint.b);
-      if (uvOf) uvs.push(...uvOf(r.cx, r.y, r.cz, r));
+      ringOf.push(ringIndex);
+      segOf.push(0);
       for (let j = 0; j < SEGMENTS; j++) {
         const a = ringIndex * SEGMENTS + j;
         const b = ringIndex * SEGMENTS + ((j + 1) % SEGMENTS);
@@ -90,13 +102,45 @@ export function loftGeometry(
       }
     }
   }
+
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new Float32BufferAttribute(col, 3));
-  if (uvOf) g.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
-  return g;
+  if (!uvOf && !fabricUv) return g;
+
+  // Textured: give every triangle its own vertices so the front/back photo seam and the wrap-around of
+  // the fabric tiling do not smear texture across a triangle.
+  const nrm = g.getAttribute('normal').array as Float32Array;
+  const P: number[] = [], C: number[] = [], N: number[] = [], UV: number[] = [], UV1: number[] = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    const tri = [idx[t], idx[t + 1], idx[t + 2]];
+    const ring = rings[ringOf[tri[0]]];
+    const front = (pos[tri[0] * 3 + 2] + pos[tri[1] * 3 + 2] + pos[tri[2] * 3 + 2]) / 3 >= ring.cz;
+    const segs = tri.map((v) => segOf[v]);
+    const wraps = Math.max(...segs) - Math.min(...segs) > SEGMENTS / 2;
+    for (const v of tri) {
+      const x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2];
+      P.push(x, y, z);
+      C.push(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]);
+      N.push(nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
+      const r = rings[ringOf[v]];
+      if (uvOf) UV.push(...uvOf(x, y, z, r, front));
+      if (fabricUv) {
+        const j = segOf[v] + (wraps && segOf[v] < SEGMENTS / 2 ? SEGMENTS : 0);
+        UV1.push((j / SEGMENTS) * ((2 * Math.PI * Math.max(r.a, 5)) / FABRIC_TILE_CM), y / FABRIC_TILE_CM);
+      }
+    }
+  }
+  const out = new BufferGeometry();
+  out.setAttribute('position', new Float32BufferAttribute(P, 3));
+  out.setAttribute('color', new Float32BufferAttribute(C, 3));
+  out.setAttribute('normal', new Float32BufferAttribute(N, 3));
+  if (uvOf) out.setAttribute('uv', new Float32BufferAttribute(UV, 2));
+  if (fabricUv) out.setAttribute('uv1', new Float32BufferAttribute(UV1, 2));
+  g.dispose();
+  return out;
 }
 
 export class ThreeRenderer {
@@ -160,6 +204,7 @@ export class ThreeRenderer {
     // With a texture the vertex colour is white so the photo shows true (red still tints tight areas).
     const cloth = textured ? new Color('#ffffff') : new Color(look.colour ?? NEUTRAL.getStyle());
     this.setTexture(look.textureDataUrl);
+    this.setFabric(look.fabricDataUrl);
 
     if (bf) this.addBodyMesh(bf);
     const shirt = parts.find((p) => p.name === 'shirt');
@@ -168,14 +213,22 @@ export class ThreeRenderer {
     const bottom = shirt ? shirt.rings[shirt.rings.length - 1].y : 0;
     for (const part of parts) {
       if (bf && part.kind === 'body') continue;
-      let uvOf: ((x: number, y: number, z: number, ring: Ring) => [number, number]) | undefined;
+      let uvOf: UvOf | undefined;
       if (textured && part.kind === 'garment') {
-        // The photo shows the front: project it straight onto the front of the shirt. The back and
-        // sleeves point at the texture's plain border texel, so they stay the garment colour.
+        // The photos show the front and the back: project each straight onto its side of the shirt.
+        // Sleeves, and a side with no photo, point at the atlas's plain border texel.
         const span = 2 * maxA * 1.2;
+        const plain: [number, number] = [0.004, 0.004];
+        const eps = 0.002;
+        const inRect = (r: { u0: number; u1: number }, u: number) => r.u0 + Math.min(1 - eps, Math.max(eps, u)) * (r.u1 - r.u0);
         uvOf = part.name === 'shirt'
-          ? (x, y, z, ring) => (z >= ring.cz ? [0.5 + (x - ring.cx) / span, (y - bottom) / Math.max(1, top - bottom)] : [0.004, 0.004])
-          : () => [0.004, 0.004];
+          ? (x, y, _z, ring, front) => {
+              const v = (y - bottom) / Math.max(1, top - bottom);
+              if (front) return look.front ? [inRect(look.front, 0.5 + (x - ring.cx) / span), v] : plain;
+              // Seen from behind the photo is mirrored: the wearer's left is on the viewer's right.
+              return look.back ? [inRect(look.back, 0.5 - (x - ring.cx) / span), v] : plain;
+            }
+          : () => plain;
       }
       this.addPart(part, part.kind === 'garment' ? cloth : SKIN, uvOf);
     }
@@ -269,17 +322,41 @@ export class ThreeRenderer {
 
   private under = new MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: DoubleSide });
 
-  private addPart(part: Part, base: Color, uvOf?: (x: number, y: number, z: number, ring: Ring) => [number, number]): void {
+  private addPart(part: Part, base: Color, uvOf?: UvOf): void {
     const g = new Group();
     g.position.set(part.origin.x, part.origin.y, 0);
     g.rotation.z = part.rotZ;
     const under = part.style === 'underwear';
     const mesh = new Mesh(
-      loftGeometry(part.rings, under ? UNDERWEAR : base, part.kind === 'body' || part.name === 'briefs', under ? undefined : uvOf),
+      loftGeometry(part.rings, under ? UNDERWEAR : base, part.kind === 'body' || part.name === 'briefs', under ? undefined : uvOf, part.kind === 'garment' && !under),
       under ? this.under : part.kind === 'garment' ? this.cloth : this.skin,
     );
     g.add(mesh);
     this.figure.add(g);
+  }
+
+  private fabricUrl: string | undefined;
+
+  private setFabric(url: string | undefined): void {
+    if (url === this.fabricUrl) return;
+    this.fabricUrl = url;
+    const old = this.cloth.bumpMap;
+    this.cloth.bumpMap = null;
+    this.cloth.needsUpdate = true;
+    old?.dispose();
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => {
+      if (this.fabricUrl !== url) return;
+      const tex = new CanvasTexture(img);
+      tex.wrapS = tex.wrapT = RepeatWrapping;
+      tex.channel = 1;
+      this.cloth.bumpMap = tex;
+      this.cloth.bumpScale = 1.2;
+      this.cloth.needsUpdate = true;
+      this.requestRender();
+    };
+    img.src = url;
   }
 
   private textureUrl: string | undefined;

@@ -5,3 +5,5 @@ dist/
 .vite/
 tests/.playwright/
 Virtual\ Fit\ Extension\ MVP\ Spec.md
+public/mediapipe/
+public/models/

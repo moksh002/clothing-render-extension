@@ -18,6 +18,15 @@ async function waitUntil<T>(get: () => T | null | undefined | false, timeoutMs: 
 
 // ---- Adapter -------------------------------------------------------------
 
+/** Every gallery photo of this product ("1 of 7"...), outside the recommendation tiles. */
+function kmartImageUrls(doc: Document): string[] {
+  const urls = [...doc.querySelectorAll<HTMLImageElement>('img[data-testid=product-alt-image]')]
+    .filter((i) => !i.closest('[data-testid=product-tile]'))
+    .map((i) => i.currentSrc || i.getAttribute('src') || '')
+    .filter(Boolean);
+  return [...new Set(urls)];
+}
+
 /** The main product photo: the first gallery image, outside the "you may also like" tiles. */
 function kmartImageUrl(doc: Document): string | undefined {
   const img = [...doc.querySelectorAll<HTMLImageElement>('img[data-testid=product-alt-image]')].find((i) => !i.closest('[data-testid=product-tile]'));
@@ -78,6 +87,7 @@ export const kmartAdapter: StoreAdapter = {
     return {
       facts,
       imageUrl: kmartImageUrl(doc),
+      imageUrls: kmartImageUrls(doc),
       sizeGuideEl: doc.querySelector('[data-testid=size-guide-btn]'),
     };
   },

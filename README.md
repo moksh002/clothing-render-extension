@@ -12,6 +12,8 @@ npm install
 npm run build
 ```
 
+`npm run build` also fetches the on-device pose model (about 6 MB, Apache-2.0) and copies MediaPipe's wasm runtime into `public/`; these are not committed. The first build needs internet.
+
 Then in Chrome:
 
 1. Open `chrome://extensions` and turn on **Developer mode** (top right).
