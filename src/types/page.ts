@@ -3,8 +3,17 @@ import type { ChartSource, Garment, ProductFacts } from './index';
 /** Appearance read from the product photo. */
 export interface PhotoLook {
   colour: string;
-  /** PNG data URL of the garment cut out of the photo, when it has a print. */
+  /** PNG data URL of the front (and back) garment cut-outs side by side, when the garment has a print. */
   textureDataUrl?: string;
+  /** Where each photo sits in the atlas (inner u-range). */
+  front?: { u0: number; u1: number };
+  back?: { u0: number; u1: number };
+  /** Greyscale PNG data URL of the fabric weave, for a bump map. */
+  fabricDataUrl?: string;
+  /** What each product photo was judged to show, for debugging and the UI. */
+  kinds?: string[];
+  /** Gallery positions of the photos used for the front and back (-1 when none). */
+  picked?: { front: number; back: number };
 }
 
 /** What the content script tells the panel about the page the user is on. */
@@ -21,8 +30,8 @@ export type PageState =
       garment?: Garment;
       source?: ChartSource;
       /** Colour and print from the product photo, when it could be read. */
-      look?: PhotoLook;
       imageUrl?: string;
+      imageUrls?: string[];
       /** Present when no chart could be resolved. */
       failure?: { reason: string; message: string };
     };

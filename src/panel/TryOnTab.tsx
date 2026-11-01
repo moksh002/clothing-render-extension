@@ -17,6 +17,7 @@ import type { BodyProfile, ChartSource, FitResult, Garment } from '../types';
 import { FitFigure } from './FitFigure';
 import { PasteChart } from './PasteChart';
 import { usePageState } from './usePageState';
+import { useGarmentLook } from './useGarmentLook';
 import { parseProductLink } from '../adapters/link';
 import type { LinkMessage } from '../types/page';
 
@@ -122,7 +123,7 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageSize]);
 
-  const photoLook = product?.look;
+  const { look: photoLook, busy: lookBusy } = useGarmentLook(product?.imageUrls ?? (product?.imageUrl ? [product.imageUrl] : undefined), product?.url);
   const look = useMemo(() => (usePhoto && photoLook ? photoLook : undefined), [usePhoto, photoLook]);
 
   const fit = useMemo(
@@ -248,6 +249,7 @@ export function TryOnTab({ goProfile }: { goProfile: () => void }) {
       {fit && (
         <>
           <FitFigure fit={fit} look={look} />
+          {lookBusy && <p className="muted small">Reading the product photos…</p>}
           {photoLook && (
             <label className="photo-look">
               <input type="checkbox" checked={usePhoto} onChange={(e) => setUsePhoto(e.target.checked)} />

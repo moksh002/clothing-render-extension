@@ -195,7 +195,7 @@ function mergeClusters(clusters: { c: RGB; share: number }[]): { c: RGB; share: 
  * Analyse a product photo. Works for model shots and flat-lays on a plain background.
  * Returns null if no garment-like region is found.
  */
-export function extractLook(img: Pixels): Look | null {
+export function extractLook(img: Pixels, region?: Box): Look | null {
   const { px, w, h } = downsample(img, 96);
 
   // Background = median of the border ring.
@@ -208,8 +208,15 @@ export function extractLook(img: Pixels): Look | null {
   const outside = outsideMask(px, w, h, bg, 24);
   const pickComponent = (skinFilter: boolean) => {
     const sil = new Uint8Array(w * h);
-    for (let i = 0; i < sil.length; i++) if (!outside[i] && (!skinFilter || !isSkin(px[i]))) sil[i] = 1;
-    return largestScoredComponent(sil, w, h);
+    for (let i = 0; i < sil.length; i++) {
+      if (outside[i] || (skinFilter && isSkin(px[i]))) continue;
+      if (region) {
+        const x = (i % w) / w, y = Math.floor(i / w) / h;
+        if (x < region.x0 || x > region.x1 || y < region.y0 || y > region.y1) continue;
+      }
+      sil[i] = 1;
+    }
+    return largestScoredComponent(sil, w, h, !!region);
   };
   // A tan or brown garment can look like skin; if the filter leaves almost nothing, ignore it.
   let comp = pickComponent(true);
@@ -224,21 +231,21 @@ export function extractLook(img: Pixels): Look | null {
     figTop = Math.min(figTop, y);
     figBottom = Math.max(figBottom, y);
   }
-  const fullBody = figBottom < 0.97 * h && figBottom - figTop > 0.7 * h;
-  const cutY = fullBody ? figTop + 0.54 * (figBottom - figTop) : h;
-  const region = new Uint8Array(w * h);
-  for (let i = 0; i < region.length; i++) if (comp.mask[i] && Math.floor(i / w) <= cutY) region[i] = 1;
+  const fullBody = !region && figBottom < 0.97 * h && figBottom - figTop > 0.7 * h;
+  const cutY = region ? region.y1 * h : fullBody ? figTop + 0.54 * (figBottom - figTop) : h;
+  const cutMask = new Uint8Array(w * h);
+  for (let i = 0; i < cutMask.length; i++) if (comp.mask[i] && Math.floor(i / w) <= cutY) cutMask[i] = 1;
 
   // Colour groups inside the region. Shading (shadow vs highlight) must not count as a print.
   const pts: RGB[] = [];
-  for (let i = 0; i < region.length; i++) if (region[i]) pts.push(px[i]);
+  for (let i = 0; i < cutMask.length; i++) if (cutMask[i]) pts.push(px[i]);
   const groups = mergeClusters(kmeans(pts, 4));
   const main = groups[0];
 
   // The garment is the main colour's biggest connected patch, plus anything enclosed by it (a print).
   const nearestGroup = (p: RGB) => groups.reduce((m, g, gi) => (dist(p, g.c) < dist(p, groups[m].c) ? gi : m), 0);
   const mainOnly = new Uint8Array(w * h);
-  for (let i = 0; i < mainOnly.length; i++) if (region[i] && nearestGroup(px[i]) === 0) mainOnly[i] = 1;
+  for (let i = 0; i < mainOnly.length; i++) if (cutMask[i] && nearestGroup(px[i]) === 0) mainOnly[i] = 1;
   const patch = largestScoredComponent(mainOnly, w, h, true);
   if (!patch) return null;
   const mask = new Uint8Array(patch.mask);
@@ -290,50 +297,4 @@ export function extractLook(img: Pixels): Look | null {
     maskWidth: w,
     maskHeight: h,
   };
-}
-
-export interface Texture {
-  width: number;
-  height: number;
-  /** RGBA */
-  data: Uint8ClampedArray;
-}
-
-/**
- * Crop the garment out of the photo as a texture. Pixels outside the garment (background, skin) are
- * filled with the garment colour, and a thin border of that colour surrounds it so back faces can
- * point at a plain texel.
- */
-export function buildTexture(img: Pixels, look: Look, maxSide = 256): Texture {
-  const bx0 = Math.floor(look.box.x0 * img.width);
-  const by0 = Math.floor(look.box.y0 * img.height);
-  const bw = Math.max(1, Math.ceil((look.box.x1 - look.box.x0) * img.width));
-  const bh = Math.max(1, Math.ceil((look.box.y1 - look.box.y0) * img.height));
-  const scale = Math.min(1, maxSide / Math.max(bw, bh));
-  const w = Math.max(1, Math.round(bw * scale));
-  const h = Math.max(1, Math.round(bh * scale));
-  const pad = 2;
-  const W = w + pad * 2;
-  const H = h + pad * 2;
-  const fill = [parseInt(look.colour.slice(1, 3), 16), parseInt(look.colour.slice(3, 5), 16), parseInt(look.colour.slice(5, 7), 16)];
-  const data = new Uint8ClampedArray(W * H * 4);
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const o = (y * W + x) * 4;
-      const inside = x >= pad && y >= pad && x < W - pad && y < H - pad;
-      let rgb = fill;
-      if (inside) {
-        const sx = Math.min(img.width - 1, bx0 + Math.floor(((x - pad) / w) * bw));
-        const sy = Math.min(img.height - 1, by0 + Math.floor(((y - pad) / h) * bh));
-        const mx = Math.min(look.maskWidth - 1, Math.floor((sx / img.width) * look.maskWidth));
-        const my = Math.min(look.maskHeight - 1, Math.floor((sy / img.height) * look.maskHeight));
-        if (look.mask[my * look.maskWidth + mx]) {
-          const i = (sy * img.width + sx) * 4;
-          rgb = [img.data[i], img.data[i + 1], img.data[i + 2]];
-        }
-      }
-      data[o] = rgb[0]; data[o + 1] = rgb[1]; data[o + 2] = rgb[2]; data[o + 3] = 255;
-    }
-  }
-  return { width: W, height: H, data };
 }

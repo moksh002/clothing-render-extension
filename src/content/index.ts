@@ -4,7 +4,6 @@
 import { classifyPage, resolveChart } from '../adapters';
 import { buildGarment } from '../adapters/garment';
 import type { ExtractResult } from '../adapters/types';
-import { loadPhotoLook } from '../look/load';
 import type { PageMessage, PageState } from '../types/page';
 
 const SIZE_BUTTON = '[data-testid=product-size-button]';
@@ -86,21 +85,13 @@ async function run() {
     facts,
     pageSize: pageSize(),
     imageUrl,
+    imageUrls: extracted.imageUrls,
   };
   publish(
     (lastPublished = outcome.ok
       ? { ...base, garment: buildGarment(facts, outcome.chart, imageUrl), source: outcome.source }
       : { ...base, failure: { reason: outcome.reason, message: outcome.message } }),
   );
-
-  // The photo takes a moment to download and analyse; show the fit first, then add the look.
-  if (imageUrl) {
-    const look = await loadPhotoLook(imageUrl);
-    if (look && id === runId && lastPublished?.kind === 'product') {
-      lastPublished = { ...lastPublished, look };
-      publish(lastPublished);
-    }
-  }
 }
 
 // Single-page sites change the URL without reloading, and the shopper can change

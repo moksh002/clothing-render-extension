@@ -4,6 +4,8 @@ export interface ExtractResult {
   facts: ProductFacts;
   /** Reference only (FR-5). */
   imageUrl?: string;
+  /** Every product photo on the page, main one first. */
+  imageUrls: string[];
   /** The element that opens or holds the page's own size guide, if any. */
   sizeGuideEl: Element | null;
 }

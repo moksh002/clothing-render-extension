@@ -24,6 +24,14 @@ const clean = (s: string | null | undefined) => (s ?? '').replace(/[ \s]+/g, ' 
 
 // ---- Adapter -------------------------------------------------------------
 
+/** Every gallery photo, in page order. */
+function targetImageUrls(doc: Document): string[] {
+  const urls = [...doc.querySelectorAll('[data-testid^=gallery-slide-] img')]
+    .map((i) => i.getAttribute('src'))
+    .filter((u): u is string => !!u && u.includes('assets.target.com.au'));
+  return [...new Set(urls)];
+}
+
 /** The first gallery photo, requested at a small size (the page asks for 1400x1600). */
 function targetImageUrl(doc: Document): string | undefined {
   const src = doc.querySelector('[data-testid=gallery-slide-0] img')?.getAttribute('src');
@@ -74,6 +82,7 @@ export const targetAdapter: StoreAdapter = {
     return {
       facts,
       imageUrl: targetImageUrl(doc),
+      imageUrls: targetImageUrls(doc),
       sizeGuideEl: doc.querySelector('[data-testid=size-guide-link]'),
     };
   },

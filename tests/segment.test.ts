@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import jpeg from 'jpeg-js';
 import { describe, expect, it } from 'vitest';
-import { buildTexture, extractLook, type Pixels } from '../src/look/segment';
+import { extractLook, type Pixels } from '../src/look/segment';
+import { buildTexture } from '../src/look/texture';
 
 const load = (name: string): Pixels => {
   const { data, width, height } = jpeg.decode(readFileSync(`tests/fixtures/images/${name}.jpg`), { useTArray: true });
@@ -59,7 +60,7 @@ describe('texture crop', () => {
   it('crops to the garment box with a plain border', () => {
     const img = load('T2');
     const look = extractLook(img)!;
-    const tex = buildTexture(img, look, 128);
+    const tex = buildTexture(img, look, { maxSide: 128 });
     expect(Math.max(tex.width, tex.height)).toBeLessThanOrEqual(128 + 4);
     const [r, g, b] = rgb(look.colour);
     // corner texel is the plain garment colour
